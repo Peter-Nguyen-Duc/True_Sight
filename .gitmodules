@@ -1,0 +1,3 @@
+[submodule "logging_decorator"]
+	path = logging_decorator
+	url = https://github.com/Peter-Nguyen-Duc/logging_decorator
