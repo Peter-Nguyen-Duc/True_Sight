@@ -1,0 +1,34 @@
+https://ollama.com/library/qwen3.5
+
+
+qwen3.6 is revealed to run mostly on CPU on this computer, severely slowing it down
+
+llava model does not support tool calling
+
+For qwen3.5 there are two choices:
+
+qwen3.5:4b
+model size: 3.3GB - 4.0GB
+context size: 256K
+
+
+qwen3.5:9b
+model size: 6.6GB - 7.6GB
+context size: 256K
+
+Try qwen3.5:4b first and see if it is sufficient, then try Qwen3.5:9b afterwards to see if it works better
+
+
+
+
+
+
+
+
+
+
+
+$ ollama ps
+
+NAME              ID              SIZE     PROCESSOR          CONTEXT    UNTIL              
+qwen3.6:latest    096fdbd02fe6    22 GB    75%/25% CPU/GPU    4096       3 minutes from now

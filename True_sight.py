@@ -3,10 +3,12 @@ from logging_decorator.decorator_logging import decorate_all_class_methods, log_
 import logging
 generate_logger_file()
 
+
 from data_handler import video_data_handler
 
+from True_sight_LLM_reasoning_module import single_agent_anomaly_detection_module
 
-decorate_all_class_methods
+@decorate_all_class_methods()
 class True_sight_interfacer:
   """
   This class is center software module for the anomaly detection method named true sight, it combines a video data manipulator, video memory module and an LLM reasoning module 
@@ -14,29 +16,38 @@ class True_sight_interfacer:
   by presenting a set of normal data points, where the estimated videos deviate from it
   """
 
-  def __init__(self):
+  def __init__(self, reasoning_module):
     self._vid_obj = None
 
+    self._reasoning_module = reasoning_module
 
+    if not(self._reasoning_module.is_alive()):
+      raise Exception("ERROR: reasoning module was not initiated properly!")
 
-  def load_data(self, path):
-    self._vid_obj = video_data_handler(path)
+    print("all system check!")
 
     
+
+
+  def load_data(self, path, image_size = None):
+    self._vid_obj = video_data_handler(path)
+    self._vid_obj.load_from_self(target_image_size=image_size)
+
+
+
+  
 
 
 
 
 
 def main():
-  vid_path = "data/DCM4_anomalies/normal_data/Video_index_0_viewport_0"
+          
+  MODEL_NAME = "qwen3.5:4b"
 
-  vid_obj = video_data_handler(vid_path)
+  reasoning_module = single_agent_anomaly_detection_module(model_name=MODEL_NAME)
 
-  for image in vid_obj._data:
-    print(image)
-    input
-
+  anomaly_detector = True_sight_interfacer(reasoning_module=reasoning_module)
   
 
           

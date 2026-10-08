@@ -32,14 +32,15 @@ class video_data_handler:
 
   
   def __init__(self, image_path):
-
     self._image_path = image_path
     self._data = None
-    self.load_images_from_path(self._image_path)
 
 
+  def load_from_self(self, target_image_size = None):
+    self.load_images_from_path(self._image_path, target_size=target_image_size)
 
-  def load_images_from_path(self, path):
+
+  def load_images_from_path(self, path, target_size=None):
     """
     SUMMARY: 
       This method finds the images in the given path and saved them as numpy arrays within the datavalues variables
@@ -53,7 +54,9 @@ class video_data_handler:
       information_checked [bool]: This variable describes if the information was successfully extrapolated from the file path
                                   so far it only returns true, because i dont have any exceptions i want to catch.
     """
+    self.clear_data()
 
+    
     files = [join(path, f) for f in listdir(path) if isfile(join(path, f)) and (get_file_extension(join(path, f)) == ".png" or get_file_extension(join(path, f)) == ".jpg")] 
     self._data = []
 
@@ -61,6 +64,17 @@ class video_data_handler:
     for file in files:
 
       im = cv2.imread(file)
+
+      if im is None:
+          continue # Skip corrupted images
+
+      # Downscaling logic
+      if target_size is not None:
+          # cv2.INTER_AREA is the best interpolation method for downscaling (shrinking)
+          # source: https://opencv.org/resizing-and-rescaling-images-with-opencv/#h-resizing-with-different-interpolation-methods
+          im = cv2.resize(im, target_size, interpolation=cv2.INTER_AREA)
+
+
       self._data.append(im)
 
 
@@ -95,7 +109,6 @@ def main():
 
   for image in vid_obj._data:
     print(image)
-    input
 
   
 

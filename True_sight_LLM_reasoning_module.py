@@ -6,7 +6,9 @@ generate_logger_file()
 
 from urllib import response
 
+import ollama
 from ollama import chat
+
 import time
 
 import logging
@@ -18,6 +20,8 @@ import numpy as np
 import cv2
 
 from data_handler import video_data_handler
+
+
 
 
 @decorate_all_class_methods()
@@ -83,32 +87,26 @@ class true_sight_reasoning_framework:
               {query}
             """
 
-    image_data = None
-    if image_input is not None:
-        if isinstance(image_input, str):
-            # It's a path, pass it as is
-            image_data = [image_input]
 
-        elif isinstance(image_input, np.ndarray):
-            # It's a numpy array, encode it to JPG bytes
-            success, buffer = cv2.imencode('.jpg', image_input)
-            if success:
-                image_data = [buffer.tobytes()]
-            else:
-                raise ValueError("Could not encode numpy array to image bytes.")
-        else:
-            raise TypeError("image_input must be either a string (path) or a numpy array.")
+    image_data = []
+
+    if isinstance(image_input, list):
+      for image in image_input:
+        image_data.append(self._get_image_data_from_input(image))
+    else:
+      image_data.append(self._get_image_data_from_input(image_input))
 
 
+      
         
-    if image_path == None:
+    if image_data == None:
       messages = [{"role": "user", 
                    "content": prompt}]
     else:
       messages = [{
           "role": "user",
           "content": prompt,
-          "images": [image_path],     # <-- flat, parallel to content
+          "images": image_data,     # <-- flat, parallel to content
       }]
 
     tools = self._tools_for_agents[self._main_agent_role].values() or None
@@ -165,6 +163,27 @@ class true_sight_reasoning_framework:
 
     return output
 
+  def _get_image_data_from_input(self, image_input):
+    image_data = None
+
+    if image_input is not None:
+      if isinstance(image_input, str):
+        # It's a path, pass it as is
+        image_data = image_input
+
+      elif isinstance(image_input, np.ndarray):
+        # It's a numpy array, encode it to JPG bytes
+        success, buffer = cv2.imencode('.jpg', image_input)
+        if success:
+          image_data = buffer.tobytes()
+        else:
+          raise ValueError("Could not encode numpy array to image bytes.")
+
+      else:
+        raise TypeError("image_input must be either a string (path) or a numpy array.")
+
+      return image_data
+
   def run_agent(self, role_name, query):
     """Run a specific agent role in the framework."""
 
@@ -206,10 +225,41 @@ class true_sight_reasoning_framework:
     return output
 
 
-  def grant_agent_function_call(self, agent_name, func, func_description):
+  def grant_agent_function_call(self, agent_name, func):
 
     self._tools_for_agents[agent_name][func.__name__] = func
 
+
+  def _ensure_model_exists(self):
+    """Checks if the model exists and pulls it if it is not found."""
+    local_models = ollama.list()
+    exists = any(m.model == self._model_name or m.model.startswith(f"{self._model_name}:") 
+                for m in local_models.models)
+    
+    if not(exists):
+      print(f"ERROR: Model with name \"{self._model_name}\" does not exist, or has yet to be downloaded.")
+
+    return exists
+
+
+  def _ensure_main_model_exists(self):
+    """ Checks if there is a main agent that runs when running framework """
+    main_model_exists = True if not(self._main_agent_role == None) else False
+
+    if not(main_model_exists):
+      print("ERROR: Main model does not exist!")
+
+    return main_model_exists
+
+
+        
+  def is_alive(self):
+    system_check = []
+
+    system_check.append(self._ensure_model_exists())
+    system_check.append(self._ensure_main_model_exists())
+
+    return all(system_check)
 
 
      
@@ -363,19 +413,19 @@ if __name__ == "__main__":
   vid_path = "data/DCM4_anomalies/normal_data/Video_index_0_viewport_0"
 
   vid_obj = video_data_handler(vid_path)
+  vid_obj.load_from_self(target_image_size=(224, 224))
 
-  image = vid_obj._data[0]
+  image = [vid_obj._data[0], vid_obj._data[100], vid_obj._data[100]]
 
   
 
-          
   MODEL_NAME = "qwen3.5:4b"
 
   agentic_system = single_agent_anomaly_detection_module(MODEL_NAME)
 
 
-  query = "in english please, this is a test run, what do you see in the image"
-  image_path = "/home/nguyenlocal/True_Sight/data/DCM4_anomalies/normal_data/Video_index_4_viewport_0/Video_index_4_viewport_0_frame_1.png"
+  query = "how many images did i pass to you, and how many unique images is there, duplicated images count for 1 only"
+  # image_path = "/home/nguyenlocal/True_Sight/data/DCM4_anomalies/normal_data/Video_index_4_viewport_0/Video_index_4_viewport_0_frame_1.png"
 
   response_val = agentic_system.run_framework(query, image_input=image)
 

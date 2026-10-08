@@ -1,4 +1,5 @@
 .venv
 data
-
-logging_decorator
+logs
+kos*
+__pycache__
