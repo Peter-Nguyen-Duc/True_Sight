@@ -13,6 +13,12 @@ import logging
 
 import os
 
+import numpy as np
+
+import cv2
+
+from data_handler import video_data_handler
+
 
 @decorate_all_class_methods()
 class true_sight_reasoning_framework:
@@ -59,7 +65,7 @@ class true_sight_reasoning_framework:
 
 
 
-  def run_framework(self, query):
+  def run_framework(self, query, image_input = None):
     """Run the framework with the main agent role."""
 
     if not self._main_agent_role:
@@ -77,17 +83,44 @@ class true_sight_reasoning_framework:
               {query}
             """
 
-    
-    messages = [{"role": "user", "content": prompt}]
+    image_data = None
+    if image_input is not None:
+        if isinstance(image_input, str):
+            # It's a path, pass it as is
+            image_data = [image_input]
 
+        elif isinstance(image_input, np.ndarray):
+            # It's a numpy array, encode it to JPG bytes
+            success, buffer = cv2.imencode('.jpg', image_input)
+            if success:
+                image_data = [buffer.tobytes()]
+            else:
+                raise ValueError("Could not encode numpy array to image bytes.")
+        else:
+            raise TypeError("image_input must be either a string (path) or a numpy array.")
+
+
+        
+    if image_path == None:
+      messages = [{"role": "user", 
+                   "content": prompt}]
+    else:
+      messages = [{
+          "role": "user",
+          "content": prompt,
+          "images": [image_path],     # <-- flat, parallel to content
+      }]
+
+    tools = self._tools_for_agents[self._main_agent_role].values() or None
 
     response = chat(
         model=self._model_name,
         messages=messages,
-        tools=self._tools_for_agents[self._main_agent_role].values(),
-        think=False
+        tools=None,
+        options={"num_ctx": 16384},
     )
-
+    if response.done_reason != "stop":
+      output = response.message.content + "\n ERROR: Model context limit has been reached!"
 
     if response.message.tool_calls:
         call = response.message.tool_calls[0]
@@ -128,8 +161,7 @@ class true_sight_reasoning_framework:
 
         output = final_response.message.content
     else:
-      output = "WARNING: non tool call is not yet supported! Main agent tried to speak without"
-
+      output = response.message.content
 
     return output
 
@@ -212,6 +244,8 @@ class single_agent_anomaly_detection_module(true_sight_reasoning_framework):
 
     #chat.dk generated reasoning role for the agent 
     reasoning_agent_description =   """
+
+                        you only speak in english
                         You are an expert Video Anomaly Detection Specialist. Your objective is to determine if a video sequence contains anomalous behavior and to precisely isolate the critical segments.
 
                         Your reasoning process must follow these steps:
@@ -326,15 +360,24 @@ class diet_planner_agentic_agent(true_sight_reasoning_framework):
 
 
 if __name__ == "__main__":
+  vid_path = "data/DCM4_anomalies/normal_data/Video_index_0_viewport_0"
 
-  MODEL_NAME = "qwen3.6"
+  vid_obj = video_data_handler(vid_path)
 
-  agentic_system = diet_planner_agentic_agent(MODEL_NAME)
+  image = vid_obj._data[0]
+
+  
+
+          
+  MODEL_NAME = "qwen3.5:4b"
+
+  agentic_system = single_agent_anomaly_detection_module(MODEL_NAME)
 
 
-  query = "I want a diet plan, I want to lose weight and I want to eat healthy food"
+  query = "in english please, this is a test run, what do you see in the image"
+  image_path = "/home/nguyenlocal/True_Sight/data/DCM4_anomalies/normal_data/Video_index_4_viewport_0/Video_index_4_viewport_0_frame_1.png"
 
-  response_val = agentic_system.run_framework(query)
+  response_val = agentic_system.run_framework(query, image_input=image)
 
   print(" ----- final response ----- ")
   print(response_val)
