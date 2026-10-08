@@ -26,7 +26,6 @@ class True_sight_interfacer:
 
     print("all system check!")
 
-    
 
 
   def load_data(self, path, image_size = None):

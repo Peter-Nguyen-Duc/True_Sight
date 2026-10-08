@@ -15,6 +15,8 @@ import os
 from os import listdir
 from os.path import isfile, join
 
+import numpy as np
+
 
 @log_decorator(logging.INFO)
 def get_file_extension(path):
@@ -39,12 +41,37 @@ class video_data_handler:
   def load_from_self(self, target_image_size = None):
     self.load_images_from_path(self._image_path, target_size=target_image_size)
 
+  def load_single_image_from_path(self, path, target_size=None):
+    """
+    SUMMARY: 
+      This method takes a path to an image and creates a numpy.ndarray variable of that image
+    
+
+    ARGS: 
+      path [string]: This variable contains the path where the images are contained.
+
+    RETURNS:
+      image_data [bool]: returns numpy.ndarray image data
+    """
+    
+    im = cv2.imread(path)
+
+    if im is None:
+      return np.array([])
+
+    # Downscaling logic
+    if target_size is not None:
+        # cv2.INTER_AREA is the best interpolation method for downscaling (shrinking)
+        # source: https://opencv.org/resizing-and-rescaling-images-with-opencv/#h-resizing-with-different-interpolation-methods
+        im = cv2.resize(im, target_size, interpolation=cv2.INTER_AREA)
+
+    return im
+
 
   def load_images_from_path(self, path, target_size=None):
     """
     SUMMARY: 
-      This method finds the images in the given path and saved them as numpy arrays within the datavalues variables
-    
+      This method clears self._data then appends the images within the input path
 
     ARGS: 
       path [string]: This variable contains the path where the images are contained.
@@ -62,18 +89,7 @@ class video_data_handler:
 
 
     for file in files:
-
-      im = cv2.imread(file)
-
-      if im is None:
-          continue # Skip corrupted images
-
-      # Downscaling logic
-      if target_size is not None:
-          # cv2.INTER_AREA is the best interpolation method for downscaling (shrinking)
-          # source: https://opencv.org/resizing-and-rescaling-images-with-opencv/#h-resizing-with-different-interpolation-methods
-          im = cv2.resize(im, target_size, interpolation=cv2.INTER_AREA)
-
+      im = self.load_single_image_from_path(path=file, target_size=target_size)
 
       self._data.append(im)
 

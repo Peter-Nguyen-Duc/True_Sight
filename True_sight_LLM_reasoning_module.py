@@ -417,14 +417,16 @@ if __name__ == "__main__":
 
   image = [vid_obj._data[0], vid_obj._data[100], vid_obj._data[100]]
 
-  
+  vid_obj.load_images_from_path("/home/nguyenlocal/True_Sight/data", target_size=(224, 224))
+
+  image.append(vid_obj._data[0])
 
   MODEL_NAME = "qwen3.5:4b"
 
   agentic_system = single_agent_anomaly_detection_module(MODEL_NAME)
 
 
-  query = "how many images did i pass to you, and how many unique images is there, duplicated images count for 1 only"
+  query = "which image is the odd one out, describe the main differences"
   # image_path = "/home/nguyenlocal/True_Sight/data/DCM4_anomalies/normal_data/Video_index_4_viewport_0/Video_index_4_viewport_0_frame_1.png"
 
   response_val = agentic_system.run_framework(query, image_input=image)
