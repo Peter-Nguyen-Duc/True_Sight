@@ -48,19 +48,20 @@ class True_sight_interfacer:
     self._vid_obj.load_from_self(target_image_size=image_size)
 
 
+
   def load_tools_for_reasoning_module(self):
     self._agent_tool_box.get_current_data(vid_data_handler=self._vid_obj, RAG=self._rag_obj)
+
     self._reasoning_module.grant_main_agent_tool(self._agent_tool_box.TOOL_get_frame_at_index)
 
-  def run_AD(self, video_folder_path, query):
 
-    Task_prompt = "TASK: this is an anomaly detection task the task is to analyze the input video, then blah blah blagh"
+  def get_tool_call(self, video_folder_path, query):
 
-    test_task = "TASK: This is just a test run, do whatever the query says"
+    Task_prompt = "TASK: Call the correct tool func given the query"
 
     prompt =  f"""
 
-              TASK: {test_task}
+              TASK: {Task_prompt}
 
               Prompt: {query}
 
@@ -72,9 +73,35 @@ class True_sight_interfacer:
 
     self.load_tools_for_reasoning_module()
     
-    self._reasoning_module.run_framework(query=prompt)
+    response = self._reasoning_module.run_framework(query=prompt)
 
-  
+
+    if response.message.tool_calls:
+
+      fetched_tools = []
+      arguments_list = []
+      for call in response.message.tool_calls:
+
+        tool_name = call.function.name
+
+        tool = self._reasoning_module._tools_for_agents[self._reasoning_module._main_agent_role][tool_name]
+        arguments = dict(call.function.arguments or {})
+
+
+        fetched_tools.append(tool)
+        arguments_list.append(arguments)
+
+
+
+    else:
+      print("ERROR: No tools was received!")
+
+      raise Exception("ERROR: Reasoning module did not fetch any tools")
+
+    return fetched_tools, arguments_list
+
+
+
 
 
 
@@ -91,13 +118,14 @@ def main():
 
   anomaly_detector = True_sight_interfacer(reasoning_module=reasoning_module, RAG_sentence_transformer_model=RAG_sentence_transformer_model, image_size=image_size)
   
-  prompt = "Aight use the tool granted to call the 10'th video index of the input video"
+  prompt = "give me the tool with the arguments required to retrieve the images of the video from index 7,8 and 4"
 
   video_data_folder = "data/DCM4_anomalies/normal_data/Video_index_0_viewport_0"
 
-  anomaly_detector.run_AD(video_folder_path=video_data_folder, query=prompt)
+  val1, val2 = anomaly_detector.get_tool_call(video_folder_path=video_data_folder, query=prompt)
 
-
+  print(f"Gained functions:  {val1}")
+  print(f"With arguments: {val2}")
 
 
 

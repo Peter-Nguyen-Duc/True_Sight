@@ -113,11 +113,11 @@ class true_sight_reasoning_framework:
     return messages
 
 
-  def run_framework(self, query, image_input = None):
+  def run_framework(self, query, image_input = None, allow_tool_calling = False):
 
     messages = self.preprocess_input(query=query, image_input=image_input)
 
-    response = self.call_main_agent(query=messages, image_input=image_input)
+    response = self.call_main_agent(query=messages, image_input=image_input, allow_tool_calling=allow_tool_calling)
 
     return response
 
@@ -129,7 +129,7 @@ class true_sight_reasoning_framework:
 
 
   
-  def call_main_agent(self, query, image_input = None):
+  def call_main_agent(self, query, image_input = None, allow_tool_calling=False):
     """Run the framework with the main agent role."""
 
     if not self._main_agent_role:
@@ -144,23 +144,23 @@ class true_sight_reasoning_framework:
     )
 
 
-    if response.message.tool_calls:
-      call = response.message.tool_calls[0]
-      tool_name = call.function.name
-      arguments = dict(call.function.arguments or {})
+    # if response.message.tool_calls and allow_tool_calling:
+    #   call = response.message.tool_calls[0]
+    #   tool_name = call.function.name
+    #   arguments = dict(call.function.arguments or {})
 
 
-      self._tools_for_agents[self._main_agent_role][tool_name](**arguments)
+    #   self._tools_for_agents[self._main_agent_role][tool_name](**arguments)
 
-      TOOL_CALL = f"""
-                ### INFORMATION -- TOOL CALLED: 
-                  {str(self._tools_for_agents[self._main_agent_role][tool_name](**arguments))}
-                """
+    #   TOOL_CALL = f"""
+    #             ### INFORMATION -- TOOL CALLED: 
+    #               {str(self._tools_for_agents[self._main_agent_role][tool_name])}
+    #             """
 
-      query[0]["content"] += TOOL_CALL
+    #   query[0]["content"] += TOOL_CALL
 
       
-      response = self.call_main_agent(query=query, image_input=image_input)
+    #   response = self.call_main_agent(query=query, image_input=image_input)
 
 
     return response
@@ -433,7 +433,10 @@ class self_reflective_single_agent(true_sight_reasoning_framework):
         main_agent=False
     )
 
-  def run_framework(self, query, image_input=None, max_reflections=3):
+
+
+
+  def run_framework(self, query, image_input=None, max_reflections=3, allow_tool_calling = False):
     """
     RUN THE FRAMEWORK WITH A REFLECTIVE LOOP
     """
