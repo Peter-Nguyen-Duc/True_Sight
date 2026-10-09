@@ -1,8 +1,6 @@
 
 
-from logging_decorator.decorator_logging import decorate_all_class_methods, log_decorator, generate_logger_file
-import logging
-generate_logger_file()
+
 
 from urllib import response
 
@@ -21,6 +19,10 @@ import cv2
 
 from data_handler import video_data_handler
 
+
+from logging_decorator.decorator_logging import decorate_all_class_methods, log_decorator, generate_logger_file
+import logging
+generate_logger_file()
 
 
 
@@ -65,15 +67,15 @@ class true_sight_reasoning_framework:
     self._goals_for_roles[role_name] = goal_for_role
 
     if main_agent:
-        self._main_agent_role = role_name
+      if not(self._main_agent_role == None):
+        print("WARNING: overwriting the main agent.")
+
+      self._main_agent_role = role_name
+
+  def preprocess_input(self, query, image_input):
 
 
-
-  def run_framework(self, query, image_input = None):
-    """Run the framework with the main agent role."""
-
-    if not self._main_agent_role:
-        raise ValueError("No main agent role defined. Please set main_agent=True for one of the agents.")
+    image_data = []
 
 
     prompt = f"""
@@ -88,7 +90,6 @@ class true_sight_reasoning_framework:
             """
 
 
-    image_data = []
 
     if isinstance(image_input, list):
       for image in image_input:
@@ -97,9 +98,9 @@ class true_sight_reasoning_framework:
       image_data.append(self._get_image_data_from_input(image_input))
 
 
-      
-        
-    if image_data == None:
+
+
+    if image_data == [None]:
       messages = [{"role": "user", 
                    "content": prompt}]
     else:
@@ -108,60 +109,66 @@ class true_sight_reasoning_framework:
           "content": prompt,
           "images": image_data,     # <-- flat, parallel to content
       }]
+  
+    return messages
 
-    tools = self._tools_for_agents[self._main_agent_role].values() or None
+
+  def run_framework(self, query, image_input = None):
+
+    messages = self.preprocess_input(query=query, image_input=image_input)
+
+    response = self.call_main_agent(query=messages, image_input=image_input)
+
+    return response
+
+
+  def get_agent_tools(self, agent_name):
+    tools = self._tools_for_agents[agent_name].values() or None
+
+    return tools
+
+
+  
+  def call_main_agent(self, query, image_input = None):
+    """Run the framework with the main agent role."""
+
+    if not self._main_agent_role:
+      raise ValueError("No main agent role defined. Please set main_agent=True for one of the agents.")
+
 
     response = chat(
-        model=self._model_name,
-        messages=messages,
-        tools=None,
-        options={"num_ctx": 16384},
+      model=self._model_name,
+      messages=query,
+      tools=self.get_agent_tools(self._main_agent_role),
+      options={"num_ctx": 16384},
     )
-    if response.done_reason != "stop":
-      output = response.message.content + "\n ERROR: Model context limit has been reached!"
+
 
     if response.message.tool_calls:
-        call = response.message.tool_calls[0]
-        tool_name = call.function.name
-        arguments = dict(call.function.arguments or {})
-                
-        # Pass the user's query as an argument to the tool
-        result = self._tools_for_agents[self._main_agent_role][tool_name](**arguments)
+      call = response.message.tool_calls[0]
+      tool_name = call.function.name
+      arguments = dict(call.function.arguments or {})
 
 
-        with open("database/diet_plan_template_output.txt", "r") as file:
-            output_template = file.read()
+      self._tools_for_agents[self._main_agent_role][tool_name](**arguments)
+
+      TOOL_CALL = f"""
+                ### INFORMATION -- TOOL CALLED: 
+                  {str(self._tools_for_agents[self._main_agent_role][tool_name](**arguments))}
+                """
+
+      query[0]["content"] += TOOL_CALL
+
+      
+      response = self.call_main_agent(query=query, image_input=image_input)
 
 
-        function_output_back_prompt = f"""
-                  ### role:
-                    {self._roles[self._main_agent_role]}
-                    
-                  ### call content:
-                    {result}
-
-                  ### goal:
-                    {self._goals_for_roles[self._main_agent_role]}
-
-                  ### output template:
-                    {output_template}
-                  """
-
-        
-        messages = [{"role": "user", "content": function_output_back_prompt}]
-        
+    return response
 
 
-        
-        final_response = chat(model=self._model_name, messages=messages, think=False)
-        print(" ----- final response ----- ")
-        print(final_response)
 
-        output = final_response.message.content
-    else:
-      output = response.message.content
 
-    return output
+    
 
   def _get_image_data_from_input(self, image_input):
     image_data = None
@@ -225,9 +232,18 @@ class true_sight_reasoning_framework:
     return output
 
 
-  def grant_agent_function_call(self, agent_name, func):
+  def grant_main_agent_tool(self, func):
+    self._tools_for_agents[self._main_agent_role][func.__name__] = func
 
+
+  def grant_agent_tool(self, agent_name, func):
     self._tools_for_agents[agent_name][func.__name__] = func
+
+  def clear_all_tools(self):
+
+    for agent_names in self._tools_for_agents.keys():
+      self._tools_for_agents[agent_names] = []
+
 
 
   def _ensure_model_exists(self):
@@ -273,7 +289,7 @@ class single_agent_anomaly_detection_module(true_sight_reasoning_framework):
   # reasonably decide wherther the data is anomalous or not.
   ###
 
-  def __init__(self, model_name):
+  def __init__(self, model_name="qwen3.5:4b"):
     """
 
     This REASONING_STATUS variable is used to ensure that the model has had enough reasoning time before giving i final answer
@@ -315,6 +331,10 @@ class single_agent_anomaly_detection_module(true_sight_reasoning_framework):
                               manipulate video data to resolve visual uncertainty.
                               """
 
+
+
+
+
     
     self.add_agent(
         role_name="reasoning_agent",
@@ -325,87 +345,160 @@ class single_agent_anomaly_detection_module(true_sight_reasoning_framework):
     )
 
 
+     
 
-
-
-class diet_planner_agentic_agent(true_sight_reasoning_framework):
-
+@decorate_all_class_methods()
+class self_reflective_single_agent(true_sight_reasoning_framework):
   ###
-  # This agentic framework is built on the blinders framework.
-  # It has two agents: a user assistant and a nutritionist. The user assistant 
-  # handles communication with the user and calls the nutritionist tool to 
-  # generate a diet plan based on the user's requirements. 
-  # The nutritionist generates a diet plan based on the user's requirements.
+  # This agentic system is used for labeling video as anomalies and highlightinh critical 
+  # parts of the video as anomalies for further inspection.
+  # Furthermore, the agent is capable of manipulating video data to ensure it has seen enough to 
+  # reasonably decide wherther the data is anomalous or not.
   ###
 
+  def __init__(self, model_name="qwen3.5:4b"):
+    """
 
+    This REASONING_STATUS variable is used to ensure that the model has had enough reasoning time before giving i final answer
+    in which the reasoning status variable is flicked into "final answer ready"
 
+    The status types for REASONING_STATUS:
+     - Awaiting prompt
+     - retrieving input
+     - Reasoning over data
+     - final answer ready
 
-  def __init__(self, model_name):
+    """
+    
     super().__init__(model_name)
 
+    self._REASONING_STATUS = "Awaiting prompt"
 
-    user_assistant_goal = """Inform the user of the decisions made by the underlying agentic system diet app.
-                          Only call the nutritionist tool to generate a diet plan based on the user's requirements.
-                          Do not make any decisions on your own.
 
-                          Get the nutrionist's output and present it to the user in a nice and readable format.
-                          """
+    #chat.dk generated reasoning role for the agent 
+    reasoning_agent_description =   """
+                        You do video analysis using the tools available and afterwards use reasoning to deduce if an image is anomalous or not
+                        """
 
-    # Example tool
-    nutrition_call_tool = {
-                  "type": "function",
-                  "function": {
-                      "name": "call_nutritionist_tool",
-                      "description": "Call the nutritionist tool to generate a diet plan based on user requirements.",
-                      "parameters": {
-                          "type": "object",
-                          "properties": {
-                              "user_requirements": {
-                                  "type": "string",
-                                  "description": "The user's requirements for the diet plan (e.g., 'I want to lose weight and eat healthy food')."
-                              }
-                          },
-                          "required": ["user_requirements"]
-                      }
-                  }
-              }
+    # This is the specific goal passed to the agent framework
+    anomaly_detection_goal =  """
+                              Commit to any video analysis task given by the user. 
+                              """
 
-    
-    
+
+    #chat.dk generated reasoning role for the agent 
+    reflective_agent = """
+                      You are a Critical Supervisory Agent and Quality Auditor. Your sole purpose is to find flaws, 
+                      omissions, or formatting errors in the Main Agent's responses. 
+
+                      You operate with a "skeptical" mindset. You do not assume the Main Agent is correct; instead, 
+                      you actively look for reasons why the response might be insufficient, misleading, or 
+                      incorrectly formatted. You are the final gatekeeper before a response reaches the user.
+                      """
+
+
+    # This is the specific goal passed to the agent framework
+    reflective_agent_goal =  """
+                            Your goal is to evaluate the interaction between the User and the Main Agent:
+
+                            1. TOOL VALIDATION: 
+                              - Determine if the query required external data or a tool call.
+                              - Check if the interaction contains the marker '### INFORMATION -- TOOL CALLED:'.
+                              - If a tool was required but NOT called, this is a failure.
+                              - If a tool WAS called, verify that the Main Agent actually used the information returned by the tool in its final answer, rather than ignoring it or hallucinating.
+                              - DEBUGGING ADDITION, when evidence of tool calling is detected, no other output is required to pass the test.
+
+                            2. FINAL VERDICT:
+                              - If the response passes, you MUST start your response with the exact word: 'APPROVED'.
+                              - If any check fails, DO NOT use 'APPROVED'. Instead, provide a detailed, bulleted list of exactly what is wrong and how the Main Agent should fix it. 
+                                Be specific (e.g., "The tool 'get_weather' was called, but you ignored the temperature value in your final answer").
+                            """
+
+
+
     self.add_agent(
-        role_name="user assistant",
-        role_description="This user handles communication with the user and calls and gives the user a 7 day diet plan based on the user requirements:",
+        role_name="reasoning_agent",
+        role_description=reasoning_agent_description,
         tool_func_list=[],
-        tool_descriptions = [],
-        goal_for_role=user_assistant_goal,
+        goal_for_role=anomaly_detection_goal,
         main_agent=True
     )
 
 
-    # self.add_agent(
-    #     role_name="nutritionist",
-    #     role_description="This user generates a nutrition plan based on the user's requirements",
-    #     tool_func_list=[],
-    #     tool_descriptions = [],
-    #     goal_for_role=nutrition_goal
-    # )
+    self.add_agent(
+        role_name="reflective_agent",
+        role_description=reflective_agent,
+        tool_func_list=[],
+        goal_for_role=reflective_agent_goal,
+        main_agent=False
+    )
+
+  def run_framework(self, query, image_input=None, max_reflections=3):
+    """
+    RUN THE FRAMEWORK WITH A REFLECTIVE LOOP
+    """
+    # 1. Initial preprocessing
+    messages = self.preprocess_input(query=query, image_input=image_input)
+    
+    # 2. Initial call to the main agent
+    response = self.call_main_agent(query=messages, image_input=image_input)
+    
+    # Loop for reflection and regeneration
+    for i in range(max_reflections):
+      # 3. Get critique from the reflective agent
+      # We pass the original query and the current response
+      reflection = self.get_reflective_agent_input(message=query, response=response)
+      
+      # 4. Check if the reflective agent is "satisfied" 
+      # (You should prompt your reflective agent to start its response 
+      # with "APPROVED" if no changes are needed)
+      if "APPROVED" in reflection.upper():
+        if not("NOT APPROVED" in reflection.upper()):
+          break
+          
+      # 5. Feedback Loop: Feed the critique back into the main agent
+      # We update the messages to include the previous attempt and the critique
+      feedback_prompt = f"Your previous response was: {response}\n\nCritique: {reflection}\n\nPlease regenerate the response addressing these points."
+      
+      # We append the feedback to the message history or pass it as a new query
+      messages.append({"role": "system", "content": feedback_prompt})
+      
+      # Regenerate response
+      response = self.call_main_agent(query=messages, image_input=image_input)
+        
+    return response
 
 
-  ###
-  # Databases and variables used in the true sight framework system
-  ###
+
+  def get_reflective_agent_input(self, message, response):
+
+    prompt = f"""
+            ### User Message:
+              {message}
+
+            ### Main Agent Response:
+              {response}
+
+            ### Instruction:
+            Evaluate the response for completeness. 
+            If response satisfies established criteria, ONLY output 'APPROVED'.
+            Otherwise, provide specific, actionable feedback on what is missing or wrong.
+            DO NOT use the word "approved" in the message if the message is not satisfiable, since this might trigger a positive feedback
+            """
+    messages = [{"role": "user", 
+                "content": prompt}]
+    
+    response = chat(
+      model=self._model_name,
+      messages=messages,
+      tools=self.get_agent_tools("reflective_agent"),
+      options={"num_ctx": 16384},
+    )
+
+    return response.message.content
 
 
-
-
-
-
-  ###
-  # Tools used in the true sight framework system 
-  ###
-
-
+  
 
 
 
