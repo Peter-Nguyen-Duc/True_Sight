@@ -57,7 +57,8 @@ class video_data_handler:
     im = cv2.imread(path)
 
     if im is None:
-      return np.array([])
+      raise Exception("ERROR: no image found at path!")
+
 
     # Downscaling logic
     if target_size is not None:
