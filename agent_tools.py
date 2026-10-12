@@ -11,7 +11,7 @@ import numpy as np
 This class lists all tools that the True sight Reasoning module can use to solve the task
 """
 
-@decorate_all_class_methods()
+@decorate_all_class_methods
 class True_sight_agent_toolbox:
   def __init__(self):
     pass

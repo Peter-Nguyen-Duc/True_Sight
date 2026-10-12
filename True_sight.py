@@ -14,9 +14,11 @@ from logging_decorator.decorator_logging import decorate_all_class_methods, log_
 import logging
 generate_logger_file()
 
+import cv2
+import numpy as np
 
 
-@decorate_all_class_methods()
+@decorate_all_class_methods
 class True_sight_interfacer:
   """
   This class is center software module for the anomaly detection method named true sight, it combines a video data manipulator, video memory module and an LLM reasoning module 
@@ -102,6 +104,55 @@ class True_sight_interfacer:
 
 
 
+  def reasoning_single_image(self, image, query, normal_data, normal_prompt):
+    """
+    SUMMARY:  This function inputs an image, normal data (both image and text), and a textual command. It 
+              It uses these inputs to generate a reasoning prompt, which will be added to the full report
+              of the video analyzer later.
+    
+    ARGS:     image [np.ndarray]: the image that will be tested if is an anomaly or not
+              Query [string]: This text is the main command that is followed by the input data
+              normal_data [[nd.ndarray]]: A list of images that are semantically close to the estimated 
+                                          image, but within the normal data. this data is retrieved
+                                          by RAG.
+              normal_prompt [string]: this text describes what in the image is focused on in terms of
+                                      what makes it normal data, and where to focus.
+
+    RETURNS:
+              Image_report [string]:  The output of this method is a string based report, which has the 
+                                      following values:
+
+                                       - Image index
+                                       - anomaly label
+                                       - anomaly description
+    """
+
+    # 1. Combine Textual Data
+    # We create a structured prompt that clearly separates the task, the user query, 
+    # and the RAG context (normal_prompt).
+    task_prompt = "TASK: Analyze the provided image for anomalies. Compare the target image against the provided 'Normal' reference images."
+        
+    combined_images = [image] + list(normal_data)
+
+
+    full_prompt = f"""
+    {task_prompt}
+
+    USER QUERY: 
+    {query}
+
+    NORMAL DATA DESCRIPTION:
+    {normal_prompt}
+
+    INSTRUCTION: 
+    Compare Image 1 against Images 2-{len(combined_images)}. 
+    If Image 1 differs significantly from the normal references in the ways described in the context, mark it as an anomaly.
+    """
+    
+    response = self._reasoning_module.run_framework(query=full_prompt, image_input=combined_images)
+
+    return response
+
 
 
 
@@ -109,6 +160,7 @@ class True_sight_interfacer:
 @log_decorator(logging.INFO)
 def main():
 
+  k_nn = 10
   image_size = (224, 224)
   RAG_sentence_transformer_model = "CLIP-ViT-B-32"
 
@@ -118,14 +170,65 @@ def main():
 
   anomaly_detector = True_sight_interfacer(reasoning_module=reasoning_module, RAG_sentence_transformer_model=RAG_sentence_transformer_model, image_size=image_size)
   
-  prompt = "give me the tool with the arguments required to retrieve the images of the video from index 7,8 and 4"
+  prompt = "Give me a report on this image. Is this anomalous or not, make both the thinking process and the output report short, and concise. Specify exactly which key arguments that has determined the verdict."
 
-  video_data_folder = "data/DCM4_anomalies/normal_data/Video_index_0_viewport_0"
+  normal_data_prompt = """
+                            ***Normal process behavior***:
+                          This process is a linear vibration feeding simulation, the linear track (large grey rectangular object) 
+                          is vibrating at a frequency where the object seems still in space, but the effect is apparent on the 
+                          object on the track which is moving forward.
 
-  val1, val2 = anomaly_detector.get_tool_call(video_folder_path=video_data_folder, query=prompt)
+                          The intention is for the object to move nigh unhindered from the left side of the track to the right.
+                          The obejct is to pass across the part trap, which is the large ramp seen in the middle of the track.
+                          All anomalous and normal behavior is solely determined based on the actions of the part on the track,
+                          which in our case is a lego roundplate. The normal process of the roundplate part is as follows: 
+                           - move towards the ramp
+                           - Climb the ramp unhindered
+                           - Fall off the ledge onto the right side of the ramp linear feeder
+                           - Move forwards on the linear feeder
+                           - As long as the roundplate is still on the track, then no anomalies has occured. 
+                          
 
-  print(f"Gained functions:  {val1}")
-  print(f"With arguments: {val2}")
+                          Anomalous behavior could be exemplified as:
+                           - The part falls of the linear feeder track after falling of the track (post track rejection)
+                           - The part falls of the linear feeding track before reaching the ramp (pre-trap rejection)
+
+                           There are more anomalous behaviors than these examples, so watch out for all behavior that does not adhere to the normal process.
+
+                           
+                              ***Normal data description***:
+                          The following normal data images are RAG retrieved semantically adjacent images of the image depicting the process that is been conducted.
+                          The images only represent static information, such as position of part in relation to the linear feeder. Thereefore it is solely the position of the object, 
+                          that should be used to determine the anomality of the object 
+                           """
+
+
+
+
+  vid_path = "data/DCM4_anomalies/normal_data/Video_index_0_viewport_0"
+  input_image_path = "data/DCM4_anomalies/normal_data/Video_index_15_viewport_0/Video_index_15_viewport_0_frame_5.png"
+
+  vid_obj = video_data_handler(vid_path)
+  vid_obj.load_from_self(target_image_size=image_size)
+
+
+  anomaly_detector.load_data(path=vid_path, image_size=image_size)
+  input_image = anomaly_detector._vid_obj.load_single_image_from_path(path=input_image_path, target_size=image_size)
+
+
+  anomaly_detector._rag_obj.append_video_to_database(anomaly_detector._vid_obj._data)
+  anomaly_detector._rag_obj.initialize_KD_tree()
+
+  output = anomaly_detector._rag_obj.run_RAG(input_image, k_nn=k_nn)
+
+
+
+  response = anomaly_detector.reasoning_single_image(image=input_image, query=prompt, normal_data=output["images"], normal_prompt=normal_data_prompt)
+
+
+
+
+  print(response)
 
 
 

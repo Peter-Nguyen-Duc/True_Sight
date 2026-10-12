@@ -26,7 +26,7 @@ generate_logger_file()
 
 
 
-@decorate_all_class_methods()
+@decorate_all_class_methods
 class true_sight_reasoning_framework:
   """
   This is a framework for building agentic systems with multiple agents.
@@ -117,7 +117,7 @@ class true_sight_reasoning_framework:
 
     messages = self.preprocess_input(query=query, image_input=image_input)
 
-    response = self.call_main_agent(query=messages, image_input=image_input, allow_tool_calling=allow_tool_calling)
+    response = self.call_main_agent(query=messages, allow_tool_calling=allow_tool_calling)
 
     return response
 
@@ -129,7 +129,7 @@ class true_sight_reasoning_framework:
 
 
   
-  def call_main_agent(self, query, image_input = None, allow_tool_calling=False):
+  def call_main_agent(self, query, allow_tool_calling=False):
     """Run the framework with the main agent role."""
 
     if not self._main_agent_role:
@@ -140,7 +140,7 @@ class true_sight_reasoning_framework:
       model=self._model_name,
       messages=query,
       tools=self.get_agent_tools(self._main_agent_role),
-      options={"num_ctx": 16384},
+      options={"num_ctx": 32768},
     )
 
 
@@ -216,7 +216,7 @@ class true_sight_reasoning_framework:
         model=self._model_name,
         messages=messages,
         tools=self._tools_for_agents[role_name].values(),
-        think=False
+        options={"num_ctx": 32768},
     )
     output = response.message.content
 
@@ -280,7 +280,7 @@ class true_sight_reasoning_framework:
 
      
 
-@decorate_all_class_methods()
+@decorate_all_class_methods
 class single_agent_anomaly_detection_module(true_sight_reasoning_framework):
   ###
   # This agentic system is used for labeling video as anomalies and highlightinh critical 
@@ -347,7 +347,7 @@ class single_agent_anomaly_detection_module(true_sight_reasoning_framework):
 
      
 
-@decorate_all_class_methods()
+@decorate_all_class_methods
 class self_reflective_single_agent(true_sight_reasoning_framework):
   ###
   # This agentic system is used for labeling video as anomalies and highlightinh critical 
@@ -444,7 +444,7 @@ class self_reflective_single_agent(true_sight_reasoning_framework):
     messages = self.preprocess_input(query=query, image_input=image_input)
     
     # 2. Initial call to the main agent
-    response = self.call_main_agent(query=messages, image_input=image_input)
+    response = self.call_main_agent(query=messages)
     
     # Loop for reflection and regeneration
     for i in range(max_reflections):
@@ -467,7 +467,7 @@ class self_reflective_single_agent(true_sight_reasoning_framework):
       messages.append({"role": "system", "content": feedback_prompt})
       
       # Regenerate response
-      response = self.call_main_agent(query=messages, image_input=image_input)
+      response = self.call_main_agent(query=messages)
         
     return response
 
@@ -495,7 +495,7 @@ class self_reflective_single_agent(true_sight_reasoning_framework):
       model=self._model_name,
       messages=messages,
       tools=self.get_agent_tools("reflective_agent"),
-      options={"num_ctx": 16384},
+      options={"num_ctx": 32768},
     )
 
     return response.message.content

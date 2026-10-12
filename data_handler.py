@@ -1,5 +1,5 @@
 
-from logging_decorator.decorator_logging import decorate_all_class_methods, log_decorator, generate_logger_file
+from logging_decorator.decorator_logging import decorate_all_class_methods, log_decorator, generate_logger_file, ignore_logging
 import logging
 generate_logger_file()
 
@@ -18,14 +18,13 @@ from os.path import isfile, join
 import numpy as np
 
 
-@log_decorator(logging.INFO)
 def get_file_extension(path):
   filename, file_extension = os.path.splitext(path)
 
   return file_extension
 
 
-@decorate_all_class_methods()
+@decorate_all_class_methods
 class video_data_handler:
   """
   This is the video data handler made for the TCC latent anomaly interfacer repurposed
@@ -41,6 +40,7 @@ class video_data_handler:
   def load_from_self(self, target_image_size = None):
     self.load_images_from_path(self._image_path, target_size=target_image_size)
 
+  @ignore_logging # This method is run many hundreds of times so we ignore it in the logging
   def load_single_image_from_path(self, path, target_size=None):
     """
     SUMMARY: 

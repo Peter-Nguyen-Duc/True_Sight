@@ -9,7 +9,7 @@ from sklearn.neighbors import KDTree
 
 from data_handler import video_data_handler
 
-from logging_decorator.decorator_logging import decorate_all_class_methods, log_decorator, generate_logger_file
+from logging_decorator.decorator_logging import decorate_all_class_methods, log_decorator, generate_logger_file, ignore_logging
 import logging
 generate_logger_file()
 
@@ -76,7 +76,7 @@ def plot_rag_results(output, target_image, k_nn=10, figsize_per_col=2.5):
 
 
 
-@decorate_all_class_methods()
+@decorate_all_class_methods
 class ImageVectorManager:
 	def __init__(self, model_name, RAG_data_path = "RAG_data"):
 		# This loads a small, fast CLIP model specifically for vectorization
@@ -92,7 +92,7 @@ class ImageVectorManager:
 
 			self.model.save(RAG_data_path + "/" + model_name )
 
-
+	@ignore_logging # This method is run many hundreds of times so we ignore it in the logging
 	def vectorize_image(self, image_np):
 		"""
 		Converts a numpy array (OpenCV format) to a normalized CLIP vector.
@@ -120,7 +120,7 @@ class ImageVectorManager:
 		return np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
 
 
-@decorate_all_class_methods()
+@decorate_all_class_methods
 class RAG_image_interfacer:
 
 	def __init__(self, image_manager: ImageVectorManager):
@@ -129,6 +129,7 @@ class RAG_image_interfacer:
 		self._normal_image_list = []
 		self._kdtree = None
 
+	@ignore_logging
 	def append_img_to_database(self, image):
 
 		vectorized_image = self._image_manager.vectorize_image(image)
@@ -206,7 +207,20 @@ class RAG_image_interfacer:
 
 
 	def run_RAG(self, query, k_nn):
+		"""
+		SUMMARY:  This function performs a Retrieval-Augmented Generation (RAG) lookup to find the k most 
+				  semantically similar images from the normal dataset. It vectorizes the input query 
+				  image and uses a k-d tree for efficient nearest-neighbor search to retrieve reference 
+				  images and their similarity scores.
 
+		ARGS:     query [np.ndarray]: The target image used as the search query to find similar normal images.
+				  k_nn [int]: The number of nearest neighbors (top-k) to retrieve from the database.
+
+		RETURNS:    output [dict]: A dictionary containing the results of the RAG retrieval, consisting of:
+					- images [np.ndarray]: An array of the retrieved normal images.
+					- cosine_sims [np.ndarray]: The calculated cosine similarity scores between the 
+					  query image and the retrieved references.
+		"""
 		if self._kdtree == None:
 			raise Exception("ERROR: kdtree was not initialized yet!")
 
