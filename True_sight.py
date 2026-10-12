@@ -16,6 +16,21 @@ generate_logger_file()
 
 import cv2
 import numpy as np
+import matplotlib.pyplot as plt
+
+from agent_tools import check_arguments_valid
+
+
+@log_decorator(logging.INFO)
+def plt_image(target_image):
+
+
+    plt.imshow(target_image)
+
+    plt.tight_layout()
+    plt.show()
+
+
 
 
 @decorate_all_class_methods
@@ -148,8 +163,17 @@ class True_sight_interfacer:
     Compare Image 1 against Images 2-{len(combined_images)}. 
     If Image 1 differs significantly from the normal references in the ways described in the context, mark it as an anomaly.
     """
-    
-    response = self._reasoning_module.run_framework(query=full_prompt, image_input=combined_images)
+
+    response_rejected = True
+
+    while response_rejected:
+      response = self._reasoning_module.run_framework(query=full_prompt, image_input=combined_images)
+
+      if not(check_arguments_valid(arguments_dict={"verdict", "anomaly_category", "reasoning"}, response=response)):
+        full_prompt += "FUNCTION MUST PASS THE FOLLOWING ARGUMENTS TO THE TOOL \"TOOL_determine_image_anomality\" TOOL CALL: \n\"verdict\" [bool], \"anomaly_category\"  [str], \"reasoning\" [str]"
+      else:
+        response_rejected = False
+
 
     return response
 
@@ -170,7 +194,7 @@ def main():
 
   anomaly_detector = True_sight_interfacer(reasoning_module=reasoning_module, RAG_sentence_transformer_model=RAG_sentence_transformer_model, image_size=image_size)
   
-  prompt = "Give me a report on this image. Is this anomalous or not, make both the thinking process and the output report short, and concise. Specify exactly which key arguments that has determined the verdict."
+  prompt = "Use the given function call, to give me an anomaly report on the target image."
 
   normal_data_prompt = """
                             ***Normal process behavior***:
@@ -187,11 +211,14 @@ def main():
                            - Fall off the ledge onto the right side of the ramp linear feeder
                            - Move forwards on the linear feeder
                            - As long as the roundplate is still on the track, then no anomalies has occured. 
+                           - Movement of the object cannot be used for argumentation, since the images does not capture directional information. 
                           
 
                           Anomalous behavior could be exemplified as:
-                           - The part falls of the linear feeder track after falling of the track (post track rejection)
-                           - The part falls of the linear feeding track before reaching the ramp (pre-trap rejection)
+                           - The part has been pushed of the linear feeder vertical to the part movement direction, due to the previous movements, when falling of the ramp (post-track rejection)
+                           - The part has been pushed of the linear feeder vertical to the part movement direction, prior to falling of the ramp (pre-trap rejection)
+                           - trap rejection means that the object has been or is amidst of being pushed off the track entirely, while movement parallel to the track direction is expected.
+                           - It is an anomaly if there are any indications that the part is orientented in such a way, that it seems to be falling off the track. 
 
                            There are more anomalous behaviors than these examples, so watch out for all behavior that does not adhere to the normal process.
 
@@ -206,7 +233,7 @@ def main():
 
 
   vid_path = "data/DCM4_anomalies/normal_data/Video_index_0_viewport_0"
-  input_image_path = "data/DCM4_anomalies/normal_data/Video_index_15_viewport_0/Video_index_15_viewport_0_frame_5.png"
+  input_image_path = "data/DCM4_anomalies/post_trap_rejection/Video_index_15_viewport_0/Video_index_15_viewport_0_frame_173.png"
 
   vid_obj = video_data_handler(vid_path)
   vid_obj.load_from_self(target_image_size=image_size)
@@ -215,22 +242,34 @@ def main():
   anomaly_detector.load_data(path=vid_path, image_size=image_size)
   input_image = anomaly_detector._vid_obj.load_single_image_from_path(path=input_image_path, target_size=image_size)
 
-
   anomaly_detector._rag_obj.append_video_to_database(anomaly_detector._vid_obj._data)
   anomaly_detector._rag_obj.initialize_KD_tree()
 
   output = anomaly_detector._rag_obj.run_RAG(input_image, k_nn=k_nn)
 
-
-
+  anomaly_detector._reasoning_module.grant_main_agent_tool(anomaly_detector._agent_tool_box.TOOL_determine_image_anomality)
   response = anomaly_detector.reasoning_single_image(image=input_image, query=prompt, normal_data=output["images"], normal_prompt=normal_data_prompt)
 
+  if response.message.tool_calls:
 
+      fetched_tools = []
+      arguments_list = []
+      for call in response.message.tool_calls:
 
+        tool_name = call.function.name
 
-  print(response)
+        tool = anomaly_detector._reasoning_module._tools_for_agents[anomaly_detector._reasoning_module._main_agent_role][tool_name]
+        arguments = dict(call.function.arguments or {})
 
+        fetched_tools.append(tool)
+        arguments_list.append(arguments)
 
+  verdict, anomaly_category, reasoning = fetched_tools[0](**arguments_list[0])
+  
+  print(f"\n{'='*60}\n COMMITTING VERDICT\n{'='*60}")
+  print(f" Verdict:   {verdict}")
+  print(f" Category:  {anomaly_category}")
+  print(f" Reasoning: {reasoning}")
 
 
 

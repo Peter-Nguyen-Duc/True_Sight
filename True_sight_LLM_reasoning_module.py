@@ -24,6 +24,7 @@ from logging_decorator.decorator_logging import decorate_all_class_methods, log_
 import logging
 generate_logger_file()
 
+from agent_tools import check_arguments_valid
 
 
 @decorate_all_class_methods
@@ -46,10 +47,13 @@ class true_sight_reasoning_framework:
 
     self._tools_for_agents = {}
 
-
     self._goals_for_roles = {}
 
     self._main_agent_role = None
+
+    # This is a copy of the agent tools, so that if additional tools are added or deleted, the standard agent are not cleared.
+    # You must manually copy the self._tools_for_agents varible into this variable when granting additional tools from a child class.
+    self._standard_agent_tools = {}
     
     
   def add_agent(self, role_name, role_description, tool_func_list, goal_for_role, main_agent = False):
@@ -391,6 +395,7 @@ class self_reflective_single_agent(true_sight_reasoning_framework):
                       You are a Critical Supervisory Agent and Quality Auditor. Your sole purpose is to find flaws, 
                       omissions, or formatting errors in the Main Agent's responses. 
 
+
                       You operate with a "skeptical" mindset. You do not assume the Main Agent is correct; instead, 
                       you actively look for reasons why the response might be insufficient, misleading, or 
                       incorrectly formatted. You are the final gatekeeper before a response reaches the user.
@@ -399,7 +404,8 @@ class self_reflective_single_agent(true_sight_reasoning_framework):
 
     # This is the specific goal passed to the agent framework
     reflective_agent_goal =  """
-                            Your goal is to evaluate the interaction between the User and the Main Agent:
+                            Your goal is to evaluate the interaction between the User and the Main Agent.
+                            Keep your verdict short and consice, to avoid a noisy output.
 
                             1. TOOL VALIDATION: 
                               - Determine if the query required external data or a tool call.
@@ -433,6 +439,11 @@ class self_reflective_single_agent(true_sight_reasoning_framework):
         main_agent=False
     )
 
+    self.grant_agent_tool("reflective_agent", self.TOOL_is_approved)
+
+
+    # Update the list of standard tools that the reflective agent is equipped with from the start
+    self._standard_agent_tools = self._tools_for_agents
 
 
 
@@ -450,18 +461,36 @@ class self_reflective_single_agent(true_sight_reasoning_framework):
     for i in range(max_reflections):
       # 3. Get critique from the reflective agent
       # We pass the original query and the current response
-      reflection = self.get_reflective_agent_input(message=query, response=response)
+      reflection_response = self.get_reflective_agent_input(message=query, response=response)
       
-      # 4. Check if the reflective agent is "satisfied" 
-      # (You should prompt your reflective agent to start its response 
-      # with "APPROVED" if no changes are needed)
-      if "APPROVED" in reflection.upper():
-        if not("NOT APPROVED" in reflection.upper()):
-          break
+      if reflection_response.message.tool_calls:
+
+        fetched_tools = []
+        arguments_list = []
+        for call in reflection_response.message.tool_calls:
+
+          tool_name = call.function.name
+
+          tool = self._tools_for_agents["reflective_agent"][tool_name]
+          arguments = dict(call.function.arguments or {})
+
+          fetched_tools.append(tool)
+          arguments_list.append(arguments)
+
+        reflective_agent_approved, critique = tool(**arguments)
+
+
+          
+      else:
+        raise Exception("ERROR: Reflective agent must always return a tool call! ")
+
+
+      if reflective_agent_approved:
+        break
           
       # 5. Feedback Loop: Feed the critique back into the main agent
       # We update the messages to include the previous attempt and the critique
-      feedback_prompt = f"Your previous response was: {response}\n\nCritique: {reflection}\n\nPlease regenerate the response addressing these points."
+      feedback_prompt = f"Your previous response was: {response}\n\nCritique: {critique}\n\nPlease regenerate the response addressing these points."
       
       # We append the feedback to the message history or pass it as a new query
       messages.append({"role": "system", "content": feedback_prompt})
@@ -471,11 +500,34 @@ class self_reflective_single_agent(true_sight_reasoning_framework):
         
     return response
 
+  def TOOL_is_approved(self, verdict: bool, reflection_critique: str) -> tuple:
+    """
+    SUMMARY:  The reflective agent will call this tool with its verdict, such that the verdict will be
+              boiled down to a boolean answer
+
+    ARGS: 
+      verdict [bool]: After thinking the reflective agent, should write to this tool if the input text is approved or not.
+      reflection_critique [str]: If the text is not approved, then the reflection critique is used to generate a better response afterwards
+
+    RETURNS:
+      verdict, reflection_critique, [(bool, str)]: The function arguments are passed directly through the function and into the code.
+    """
+
+    return verdict, reflection_critique
 
 
   def get_reflective_agent_input(self, message, response):
 
     prompt = f"""
+
+            ALWAYS ANSWER BY USING THE TOOL "TOOL_is_approved"
+            fill out the arguments with the verdict and the reason, such that:
+            verdict = True, if the text is APPROVED
+            verdict = False, if the text is NOT APPROVED
+
+            reflection_critique: Contains the arguments of the verdict
+    
+
             ### User Message:
               {message}
 
@@ -483,22 +535,37 @@ class self_reflective_single_agent(true_sight_reasoning_framework):
               {response}
 
             ### Instruction:
-            Evaluate the response for completeness. 
+            Evaluate the response for completeness, and only ever output the tool call "TOOL_is_approved" with the corresponding arguments,
             If response satisfies established criteria, ONLY output 'APPROVED'.
             Otherwise, provide specific, actionable feedback on what is missing or wrong.
             DO NOT use the word "approved" in the message if the message is not satisfiable, since this might trigger a positive feedback
             """
+    tool_call_invalid = True
     messages = [{"role": "user", 
-                "content": prompt}]
-    
-    response = chat(
-      model=self._model_name,
-      messages=messages,
-      tools=self.get_agent_tools("reflective_agent"),
-      options={"num_ctx": 32768},
-    )
+            "content": prompt}]
+    messages_augmented = messages
 
-    return response.message.content
+
+    while tool_call_invalid:
+
+      response = chat(
+        model=self._model_name,
+        messages=messages_augmented,
+        tools=self.get_agent_tools("reflective_agent"),
+        options={"num_ctx": 32768},
+      )
+
+      if not(response.message.tool_calls):
+        messages_augmented[0]["content"] += "REFLECTIVE AGENT MUST ONLY USE THE TOOL CALL \"TOOL_is_approved\""
+
+      if not(check_arguments_valid(arguments_dict={"verdict", "reflection_critique"}, response=response)):
+        messages_augmented[0]["content"] += "FUNCTION MUST PASS THE FOLLOWING ARGUMENTS TO THE \"TOOL_is_approved\" TOOL CALL: verdict [bool], reflection_critique [str]"
+
+      else:
+        tool_call_invalid = False
+
+
+    return response
 
 
   
