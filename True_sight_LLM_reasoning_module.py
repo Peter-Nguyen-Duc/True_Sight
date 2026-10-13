@@ -1,6 +1,6 @@
 
 
-
+import copy
 
 from urllib import response
 
@@ -24,7 +24,7 @@ from logging_decorator.decorator_logging import decorate_all_class_methods, log_
 import logging
 generate_logger_file()
 
-from agent_tools import check_arguments_valid
+from agent_tools import check_arguments_valid, variable_constrained_prompt
 
 
 @decorate_all_class_methods
@@ -117,11 +117,11 @@ class true_sight_reasoning_framework:
     return messages
 
 
-  def run_framework(self, query, image_input = None, allow_tool_calling = False):
+  def run_framework(self, query, image_input = None, allow_tool_calling = False, variable_constrain=None):
 
     messages = self.preprocess_input(query=query, image_input=image_input)
 
-    response = self.call_main_agent(query=messages, allow_tool_calling=allow_tool_calling)
+    response = self.call_main_agent(query=messages, allow_tool_calling=allow_tool_calling, variable_constrain=variable_constrain)
 
     return response
 
@@ -133,39 +133,21 @@ class true_sight_reasoning_framework:
 
 
   
-  def call_main_agent(self, query, allow_tool_calling=False):
+  def call_main_agent(self, query, variable_constrain=None):
     """Run the framework with the main agent role."""
 
     if not self._main_agent_role:
       raise ValueError("No main agent role defined. Please set main_agent=True for one of the agents.")
 
-
-    response = chat(
-      model=self._model_name,
-      messages=query,
-      tools=self.get_agent_tools(self._main_agent_role),
-      options={"num_ctx": 32768},
-    )
-
-
-    # if response.message.tool_calls and allow_tool_calling:
-    #   call = response.message.tool_calls[0]
-    #   tool_name = call.function.name
-    #   arguments = dict(call.function.arguments or {})
-
-
-    #   self._tools_for_agents[self._main_agent_role][tool_name](**arguments)
-
-    #   TOOL_CALL = f"""
-    #             ### INFORMATION -- TOOL CALLED: 
-    #               {str(self._tools_for_agents[self._main_agent_role][tool_name])}
-    #             """
-
-    #   query[0]["content"] += TOOL_CALL
-
-      
-    #   response = self.call_main_agent(query=query, image_input=image_input)
-
+    if variable_constrain == None:
+      response = chat(
+        model=self._model_name,
+        messages=query,
+        tools=self.get_agent_tools(self._main_agent_role),
+        options={"num_ctx": 32768},
+      )
+    else:
+      response = variable_constrained_prompt(message=query, variable_dict=variable_constrain, model_name=self._model_name)
 
     return response
 
@@ -244,11 +226,11 @@ class true_sight_reasoning_framework:
     self._tools_for_agents[agent_name][func.__name__] = func
 
   def clear_all_tools(self):
-
-    for agent_names in self._tools_for_agents.keys():
-      self._tools_for_agents[agent_names] = []
-
-
+    """
+    Clears all tools granted during runtime of the agent, does not clear the standard tools required for the agentic system to run. 
+    """
+    # default back to the old copied values
+    self._tools_for_agents = copy.deepcopy(self._standard_agent_tools)
 
   def _ensure_model_exists(self):
     """Checks if the model exists and pulls it if it is not found."""
@@ -439,15 +421,13 @@ class self_reflective_single_agent(true_sight_reasoning_framework):
         main_agent=False
     )
 
-    self.grant_agent_tool("reflective_agent", self.TOOL_is_approved)
-
 
     # Update the list of standard tools that the reflective agent is equipped with from the start
-    self._standard_agent_tools = self._tools_for_agents
+    self._standard_agent_tools = copy.deepcopy(self._tools_for_agents)
+    
 
 
-
-  def run_framework(self, query, image_input=None, max_reflections=3, allow_tool_calling = False):
+  def run_framework(self, query, image_input=None, max_reflections=3, variable_constrain = None):
     """
     RUN THE FRAMEWORK WITH A REFLECTIVE LOOP
     """
@@ -455,77 +435,32 @@ class self_reflective_single_agent(true_sight_reasoning_framework):
     messages = self.preprocess_input(query=query, image_input=image_input)
     
     # 2. Initial call to the main agent
-    response = self.call_main_agent(query=messages)
+    response = self.call_main_agent(query=messages, variable_constrain=variable_constrain)
     
     # Loop for reflection and regeneration
     for i in range(max_reflections):
-      # 3. Get critique from the reflective agent
-      # We pass the original query and the current response
-      reflection_response = self.get_reflective_agent_input(message=query, response=response)
-      
-      if reflection_response.message.tool_calls:
 
-        fetched_tools = []
-        arguments_list = []
-        for call in reflection_response.message.tool_calls:
+      is_approved, reasoning = self.get_reflective_agent_input(message=query, response=response)
 
-          tool_name = call.function.name
-
-          tool = self._tools_for_agents["reflective_agent"][tool_name]
-          arguments = dict(call.function.arguments or {})
-
-          fetched_tools.append(tool)
-          arguments_list.append(arguments)
-
-        reflective_agent_approved, critique = tool(**arguments)
-
-
-          
-      else:
-        raise Exception("ERROR: Reflective agent must always return a tool call! ")
-
-
-      if reflective_agent_approved:
+      if is_approved:
         break
           
-      # 5. Feedback Loop: Feed the critique back into the main agent
-      # We update the messages to include the previous attempt and the critique
-      feedback_prompt = f"Your previous response was: {response}\n\nCritique: {critique}\n\nPlease regenerate the response addressing these points."
+      feedback_prompt = f"Your previous response was: {response}\n\nCritique: {reasoning}\n\nPlease regenerate the response addressing these points."
+      messages.append({"role": "user", "content": feedback_prompt})
       
-      # We append the feedback to the message history or pass it as a new query
-      messages.append({"role": "system", "content": feedback_prompt})
-      
-      # Regenerate response
       response = self.call_main_agent(query=messages)
         
     return response
 
-  def TOOL_is_approved(self, verdict: bool, reflection_critique: str) -> tuple:
-    """
-    SUMMARY:  The reflective agent will call this tool with its verdict, such that the verdict will be
-              boiled down to a boolean answer
 
-    ARGS: 
-      verdict [bool]: After thinking the reflective agent, should write to this tool if the input text is approved or not.
-      reflection_critique [str]: If the text is not approved, then the reflection critique is used to generate a better response afterwards
-
-    RETURNS:
-      verdict, reflection_critique, [(bool, str)]: The function arguments are passed directly through the function and into the code.
-    """
-
-    return verdict, reflection_critique
-
-
-  def get_reflective_agent_input(self, message, response):
+  def get_reflective_agent_input(self, message, response) -> tuple[bool, str]:
 
     prompt = f"""
-
-            ALWAYS ANSWER BY USING THE TOOL "TOOL_is_approved"
             fill out the arguments with the verdict and the reason, such that:
             verdict = True, if the text is APPROVED
             verdict = False, if the text is NOT APPROVED
 
-            reflection_critique: Contains the arguments of the verdict
+            reasoning: Contains the arguments of the verdict
     
 
             ### User Message:
@@ -535,37 +470,24 @@ class self_reflective_single_agent(true_sight_reasoning_framework):
               {response}
 
             ### Instruction:
-            Evaluate the response for completeness, and only ever output the tool call "TOOL_is_approved" with the corresponding arguments,
-            If response satisfies established criteria, ONLY output 'APPROVED'.
-            Otherwise, provide specific, actionable feedback on what is missing or wrong.
-            DO NOT use the word "approved" in the message if the message is not satisfiable, since this might trigger a positive feedback
+            If response satisfies established criteria, set boolean "is_approved" to true.
+            Otherwise, provide specific, actionable feedback on what is missing or wrong and set "is_approved" = False.
             """
-    tool_call_invalid = True
+
+    
     messages = [{"role": "user", 
             "content": prompt}]
-    messages_augmented = messages
 
 
-    while tool_call_invalid:
+    variable_dict = {"is_approved": bool,
+                     "reasoning": str,
+                      }
+    output = variable_constrained_prompt(messages, variable_dict, model_name=self._model_name)
 
-      response = chat(
-        model=self._model_name,
-        messages=messages_augmented,
-        tools=self.get_agent_tools("reflective_agent"),
-        options={"num_ctx": 32768},
-      )
+    is_approved = output["is_approved"]
+    reasoning = output["reasoning"]
 
-      if not(response.message.tool_calls):
-        messages_augmented[0]["content"] += "REFLECTIVE AGENT MUST ONLY USE THE TOOL CALL \"TOOL_is_approved\""
-
-      if not(check_arguments_valid(arguments_dict={"verdict", "reflection_critique"}, response=response)):
-        messages_augmented[0]["content"] += "FUNCTION MUST PASS THE FOLLOWING ARGUMENTS TO THE \"TOOL_is_approved\" TOOL CALL: verdict [bool], reflection_critique [str]"
-
-      else:
-        tool_call_invalid = False
-
-
-    return response
+    return is_approved, reasoning
 
 
   

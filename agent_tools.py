@@ -6,13 +6,16 @@ from data_handler import video_data_handler
 from RAG import RAG_image_interfacer
 import numpy as np
 
-from ollama import ChatResponse
+from ollama import ChatResponse, chat
 
+import json
 
 """
 This class lists all tools that the True sight Reasoning module can use to solve the task
 """
 
+
+@log_decorator(logging.INFO)
 def check_arguments_valid(arguments_dict: dict, response: ChatResponse):
 
 
@@ -22,11 +25,128 @@ def check_arguments_valid(arguments_dict: dict, response: ChatResponse):
     actual_keys = set(first_call.function.arguments.keys())
 
     # 3. Compare
-    if actual_keys == arguments_dict:
+    if actual_keys == arguments_dict.keys():
       return True
 
     else:
       return False
+
+@log_decorator(logging.INFO)
+def generate_dynamic_tool(variable_dict: dict) -> list:
+    """
+    Converts a dictionary of values into a JSON tool schema 
+    that forces the LLM to use these specific keys.
+    """
+
+    # supported variables that can be passed into the LLM model
+    type_map = {
+        int: "integer",
+        float: "number",
+        str: "string",
+        bool: "boolean",
+        list: "array",
+        dict: "object"
+    }
+
+    properties = {}
+    required_fields = []
+
+    for key, value in variable_dict.items():
+
+        # 1. CLEAN THE KEY: Remove trailing colons or spaces
+        clean_key = key.strip().replace(":", "")
+
+        if key!=clean_key:
+          raise Exception(f"Key \"{key}\" contained illegal variables! change your key values,")
+
+        # Determine the type of the value to tell the model what to send back
+        val_type = value
+        json_type = type_map.get(val_type, "string") 
+        
+        properties[key] = {
+            "type": json_type,
+            "description": f"Required value for {key}. Current target value: {value}"
+        }
+        required_fields.append(key)
+
+    # This is the standard format expected by most LLM tool-calling APIs
+    return [{
+        "type": "function",
+        "function": {
+            "name": "TOOL_dynamic_variable_constrained_output",
+            "description": "This method forces the LLM to give its output using a specific variable defined by the user.",
+            "parameters": {
+                "type": "object",
+                "properties": properties,
+                "required": required_fields
+            }
+        }
+    }]
+
+@log_decorator(logging.INFO)
+def variable_constrained_prompt(message, variable_dict: dict, model_name: str):
+
+  current_messages = list(message)
+
+
+  # 2. Create a strict instruction for the model
+  type_hints = {k: v.__name__ for k, v in variable_dict.items()}
+  constraints_str_keys = json.dumps(type_hints, indent=2)
+
+  instruction = (
+      f"You MUST call the tool 'TOOL_dynamic_variable_constrained_output'. "
+      f"You are REQUIRED to pass the following exact arguments:\n{constraints_str_keys}"
+  )
+  current_messages.append({"role": "user", "content": instruction})
+
+  response_rejected = True
+  max_tries = 3
+  iters = 0
+
+  while response_rejected:
+    variable_constrain_tool = generate_dynamic_tool(variable_dict)
+
+
+    response = chat(
+      model=model_name,
+      messages=current_messages,
+      tools=variable_constrain_tool,
+      options={"num_ctx": 32768},
+    )
+
+
+    if not(check_arguments_valid(arguments_dict=variable_dict, response=response)):
+      error_msg = (
+          f"ERROR: The tool call was rejected because it did not contain the required variables. "
+          f"You MUST pass the following arguments to the tool 'TOOL_determine_image_anomality': {variable_dict}"
+      )
+      current_messages.append({"role": "user", "content": error_msg})
+
+      iters += 1
+
+      if iters > max_tries:
+        raise Exception(f"ERROR: Model could not follow the format, after {max_tries} re-evaluations!")
+      
+    else:
+      response_rejected = False
+
+
+  if response.message.tool_calls:
+
+    fetched_tools = []
+    arguments_list = []
+
+    for call in response.message.tool_calls:
+
+      tool_name = call.function.name
+
+      arguments = dict(call.function.arguments or {})
+
+      arguments_list.append(arguments)
+
+    dict_variables = (arguments_list[0])
+
+  return dict_variables
 
 
 @decorate_all_class_methods

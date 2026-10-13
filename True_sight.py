@@ -119,7 +119,7 @@ class True_sight_interfacer:
 
 
 
-  def reasoning_single_image(self, image, query, normal_data, normal_prompt):
+  def run_reasoning_module(self, image, query, normal_data, normal_prompt) -> tuple[bool, str, str]:
     """
     SUMMARY:  This function inputs an image, normal data (both image and text), and a textual command. It 
               It uses these inputs to generate a reasoning prompt, which will be added to the full report
@@ -142,9 +142,6 @@ class True_sight_interfacer:
                                        - anomaly description
     """
 
-    # 1. Combine Textual Data
-    # We create a structured prompt that clearly separates the task, the user query, 
-    # and the RAG context (normal_prompt).
     task_prompt = "TASK: Analyze the provided image for anomalies. Compare the target image against the provided 'Normal' reference images."
         
     combined_images = [image] + list(normal_data)
@@ -164,20 +161,92 @@ class True_sight_interfacer:
     If Image 1 differs significantly from the normal references in the ways described in the context, mark it as an anomaly.
     """
 
-    response_rejected = True
-
-    while response_rejected:
-      response = self._reasoning_module.run_framework(query=full_prompt, image_input=combined_images)
-
-      if not(check_arguments_valid(arguments_dict={"verdict", "anomaly_category", "reasoning"}, response=response)):
-        full_prompt += "FUNCTION MUST PASS THE FOLLOWING ARGUMENTS TO THE TOOL \"TOOL_determine_image_anomality\" TOOL CALL: \n\"verdict\" [bool], \"anomaly_category\"  [str], \"reasoning\" [str]"
-      else:
-        response_rejected = False
+    variable_constrain = {"is_anomaly": bool, 
+                          "anomaly_category": str,
+                          "description": str,}
+    
+    output = self._reasoning_module.run_framework(query=full_prompt, image_input=combined_images, variable_constrain=variable_constrain)
 
 
-    return response
+    return output["is_anomaly"], output["anomaly_category"], output["description"]
+
+  
 
 
+
+
+  def single_image_AD(self, vid_path, input_image_path, k_nn, image_size, prompt):
+
+
+
+    task = "Use the given function call, to give me an anomaly report on the target image."
+
+    full_prompt = f"""
+                  TASK: {task}
+
+                  PROMPT: {prompt}
+                  """
+
+    normal_data_prompt = """
+                              ***Normal process behavior***:
+                            This process is a linear vibration feeding simulation, the linear track (large grey rectangular object) 
+                            is vibrating at a frequency where the object seems still in space, but the effect is apparent on the 
+                            object on the track which is moving forward.
+
+                            The intention is for the object to move nigh unhindered from the left side of the track to the right.
+                            The obejct is to pass across the part trap, which is the large ramp seen in the middle of the track.
+                            All anomalous and normal behavior is solely determined based on the actions of the part on the track,
+                            which in our case is a lego roundplate. The normal process of the roundplate part is as follows: 
+                            - move towards the ramp
+                            - Climb the ramp unhindered
+                            - Fall off the ledge onto the right side of the ramp linear feeder
+                            - Move forwards on the linear feeder
+                            - As long as the roundplate is still on the track, then no anomalies has occured. 
+                            - Movement of the object cannot be used for argumentation, since the images does not capture directional information. 
+                            
+
+                            Anomalous behavior could be exemplified as:
+                            - The part has been pushed of the linear feeder vertical to the part movement direction, due to the previous movements, when falling of the ramp (post-track rejection)
+                            - The part has been pushed of the linear feeder vertical to the part movement direction, prior to falling of the ramp (pre-trap rejection)
+                            - trap rejection means that the object has been or is amidst of being pushed off the track entirely, while movement parallel to the track direction is expected.
+                            - It is an anomaly if there are any indications that the part is orientented in such a way, that it seems to be falling off the track. 
+
+                            There are more anomalous behaviors than these examples, so watch out for all behavior that does not adhere to the normal process.
+
+                            
+                                ***Normal data description***:
+                            The following normal data images are RAG retrieved semantically adjacent images of the image depicting the process that is been conducted.
+                            The images only represent static information, such as position of part in relation to the linear feeder. Thereefore it is solely the position of the object, 
+                            that should be used to determine the anomality of the object 
+                            """
+
+    # Clean up the data storage before running.
+    if self._rag_obj != None: self._rag_obj.clear_database()
+    if self._vid_obj != None: self._vid_obj.clear_data()
+    if self._reasoning_module != None: self._reasoning_module.clear_all_tools()
+
+
+    vid_obj = video_data_handler(vid_path)
+    vid_obj.load_from_self(target_image_size=image_size)
+
+
+    self.load_data(path=vid_path, image_size=image_size)
+    input_image = self._vid_obj.load_single_image_from_path(path=input_image_path, target_size=image_size)
+
+    self._rag_obj.append_video_to_database(self._vid_obj._data)
+    self._rag_obj.initialize_KD_tree()
+
+    output = self._rag_obj.run_RAG(input_image, k_nn=k_nn)
+
+    self._reasoning_module.grant_main_agent_tool(self._agent_tool_box.TOOL_determine_image_anomality)
+    is_anomaly, anomaly_category, description = self.run_reasoning_module(image=input_image, query=full_prompt, normal_data=output["images"], normal_prompt=normal_data_prompt)
+    
+    print(f"\n{'='*60}\n COMMITTING VERDICT\n{'='*60}")
+    print(f" Verdict:   {is_anomaly}")
+    print(f" Category:  {anomaly_category}")
+    print(f" Reasoning: {description}")
+
+    return is_anomaly, anomaly_category, description
 
 
 
@@ -194,82 +263,16 @@ def main():
 
   anomaly_detector = True_sight_interfacer(reasoning_module=reasoning_module, RAG_sentence_transformer_model=RAG_sentence_transformer_model, image_size=image_size)
   
+
   prompt = "Use the given function call, to give me an anomaly report on the target image."
-
-  normal_data_prompt = """
-                            ***Normal process behavior***:
-                          This process is a linear vibration feeding simulation, the linear track (large grey rectangular object) 
-                          is vibrating at a frequency where the object seems still in space, but the effect is apparent on the 
-                          object on the track which is moving forward.
-
-                          The intention is for the object to move nigh unhindered from the left side of the track to the right.
-                          The obejct is to pass across the part trap, which is the large ramp seen in the middle of the track.
-                          All anomalous and normal behavior is solely determined based on the actions of the part on the track,
-                          which in our case is a lego roundplate. The normal process of the roundplate part is as follows: 
-                           - move towards the ramp
-                           - Climb the ramp unhindered
-                           - Fall off the ledge onto the right side of the ramp linear feeder
-                           - Move forwards on the linear feeder
-                           - As long as the roundplate is still on the track, then no anomalies has occured. 
-                           - Movement of the object cannot be used for argumentation, since the images does not capture directional information. 
-                          
-
-                          Anomalous behavior could be exemplified as:
-                           - The part has been pushed of the linear feeder vertical to the part movement direction, due to the previous movements, when falling of the ramp (post-track rejection)
-                           - The part has been pushed of the linear feeder vertical to the part movement direction, prior to falling of the ramp (pre-trap rejection)
-                           - trap rejection means that the object has been or is amidst of being pushed off the track entirely, while movement parallel to the track direction is expected.
-                           - It is an anomaly if there are any indications that the part is orientented in such a way, that it seems to be falling off the track. 
-
-                           There are more anomalous behaviors than these examples, so watch out for all behavior that does not adhere to the normal process.
-
-                           
-                              ***Normal data description***:
-                          The following normal data images are RAG retrieved semantically adjacent images of the image depicting the process that is been conducted.
-                          The images only represent static information, such as position of part in relation to the linear feeder. Thereefore it is solely the position of the object, 
-                          that should be used to determine the anomality of the object 
-                           """
-
-
-
 
   vid_path = "data/DCM4_anomalies/normal_data/Video_index_0_viewport_0"
   input_image_path = "data/DCM4_anomalies/post_trap_rejection/Video_index_15_viewport_0/Video_index_15_viewport_0_frame_173.png"
 
-  vid_obj = video_data_handler(vid_path)
-  vid_obj.load_from_self(target_image_size=image_size)
+  anomaly_detector.single_image_AD(vid_path=vid_path, input_image_path=input_image_path, k_nn=k_nn, image_size=image_size, prompt=prompt)
 
 
-  anomaly_detector.load_data(path=vid_path, image_size=image_size)
-  input_image = anomaly_detector._vid_obj.load_single_image_from_path(path=input_image_path, target_size=image_size)
 
-  anomaly_detector._rag_obj.append_video_to_database(anomaly_detector._vid_obj._data)
-  anomaly_detector._rag_obj.initialize_KD_tree()
-
-  output = anomaly_detector._rag_obj.run_RAG(input_image, k_nn=k_nn)
-
-  anomaly_detector._reasoning_module.grant_main_agent_tool(anomaly_detector._agent_tool_box.TOOL_determine_image_anomality)
-  response = anomaly_detector.reasoning_single_image(image=input_image, query=prompt, normal_data=output["images"], normal_prompt=normal_data_prompt)
-
-  if response.message.tool_calls:
-
-      fetched_tools = []
-      arguments_list = []
-      for call in response.message.tool_calls:
-
-        tool_name = call.function.name
-
-        tool = anomaly_detector._reasoning_module._tools_for_agents[anomaly_detector._reasoning_module._main_agent_role][tool_name]
-        arguments = dict(call.function.arguments or {})
-
-        fetched_tools.append(tool)
-        arguments_list.append(arguments)
-
-  verdict, anomaly_category, reasoning = fetched_tools[0](**arguments_list[0])
-  
-  print(f"\n{'='*60}\n COMMITTING VERDICT\n{'='*60}")
-  print(f" Verdict:   {verdict}")
-  print(f" Category:  {anomaly_category}")
-  print(f" Reasoning: {reasoning}")
 
 
 
