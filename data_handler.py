@@ -32,9 +32,9 @@ class video_data_handler:
   """
 
   
-  def __init__(self, image_path):
+  def __init__(self, image_path = None):
     self._image_path = image_path
-    self._data = None
+    self._data = []
 
 
   def load_from_self(self, target_image_size = None):
@@ -82,20 +82,18 @@ class video_data_handler:
       information_checked [bool]: This variable describes if the information was successfully extrapolated from the file path
                                   so far it only returns true, because i dont have any exceptions i want to catch.
     """
-    self.clear_data()
 
-    
     files = [join(path, f) for f in listdir(path) if isfile(join(path, f)) and (get_file_extension(join(path, f)) == ".png" or get_file_extension(join(path, f)) == ".jpg")] 
-    self._data = []
-
 
     for file in files:
       im = self.load_single_image_from_path(path=file, target_size=target_size)
 
       self._data.append(im)
 
-
     return True
+
+
+  
 
   def get_data(self):
     return self._data
@@ -114,7 +112,7 @@ class video_data_handler:
 
 
   def clear_data(self):
-    self._data = None
+    self._data = []
 
 
 

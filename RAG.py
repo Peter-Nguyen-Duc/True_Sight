@@ -135,10 +135,11 @@ class RAG_image_interfacer:
 		vectorized_image = self._image_manager.vectorize_image(image)
 
 		self._vectorized_normal_image_list.append(vectorized_image)
+
 		self._normal_image_list.append(image)
 
 
-	def append_video_to_database(self, image_list):
+	def append_to_database(self, image_list):
 		"""
 		SUMMARY: 
 								This method uses a list og images in lexicographical order to represent the images
@@ -303,7 +304,7 @@ def main():
 	vid_obj = video_data_handler(vid_path)
 	vid_obj.load_from_self(target_image_size=image_size)
 
-	rag_obj.append_video_to_database(vid_obj._data)
+	rag_obj.append_to_database(vid_obj._data)
 	rag_obj.initialize_KD_tree()
 
 

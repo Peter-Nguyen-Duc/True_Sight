@@ -296,8 +296,6 @@ class single_agent_anomaly_detection_module(true_sight_reasoning_framework):
 
     #chat.dk generated reasoning role for the agent 
     reasoning_agent_description =   """
-
-                        you only speak in english
                         You are an expert Video Anomaly Detection Specialist. Your objective is to determine if a video sequence contains anomalous behavior and to precisely isolate the critical segments.
 
                         Your reasoning process must follow these steps:
@@ -317,11 +315,6 @@ class single_agent_anomaly_detection_module(true_sight_reasoning_framework):
                               manipulate video data to resolve visual uncertainty.
                               """
 
-
-
-
-
-    
     self.add_agent(
         role_name="reasoning_agent",
         role_description=reasoning_agent_description,
@@ -363,7 +356,7 @@ class self_reflective_single_agent(true_sight_reasoning_framework):
 
     #chat.dk generated reasoning role for the agent 
     reasoning_agent_description =   """
-                        You do video analysis using the tools available and afterwards use reasoning to deduce if an image is anomalous or not
+                        You do video analysis using the tools available and afterwards use reasoning to deduce if an image or a video is anomalous or not
                         """
 
     # This is the specific goal passed to the agent framework
@@ -391,7 +384,6 @@ class self_reflective_single_agent(true_sight_reasoning_framework):
 
                             1. TOOL VALIDATION: 
                               - Determine if the query required external data or a tool call.
-                              - Check if the interaction contains the marker '### INFORMATION -- TOOL CALLED:'.
                               - If a tool was required but NOT called, this is a failure.
                               - If a tool WAS called, verify that the Main Agent actually used the information returned by the tool in its final answer, rather than ignoring it or hallucinating.
                               - DEBUGGING ADDITION, when evidence of tool calling is detected, no other output is required to pass the test.

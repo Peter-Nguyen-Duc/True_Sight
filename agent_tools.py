@@ -177,22 +177,3 @@ class True_sight_agent_toolbox:
     return im 
 
 
-  
-
-  def TOOL_determine_image_anomality(self, verdict: bool, anomaly_category: str, reasoning: str) -> tuple:
-      """
-      SUMMARY:  The reasoning agent will call this tool to finalize the anomaly assessment. 
-                This crystallizes the agent's reasoning into a formal verdict and classification.
-
-      ARGS: 
-        verdict [bool]: True if the image is anomalous, False if it is normal.
-        anomaly_category [str]: The specific type of anomaly. 
-                                Valid options: 'Stuck on track', 'Pre-trap rejection', 
-                                'Post-trap rejection', 'Other', or 'None' (if normal).
-        reasoning [str]: A concise explanation of the visual evidence supporting the verdict.
-
-      RETURNS:
-        (bool, str, str): The verdict, category, and reasoning are passed directly through 
-                          to the framework for final reporting and logging.
-      """
-      return verdict, anomaly_category, reasoning
