@@ -218,6 +218,7 @@ class True_sight_interfacer:
 def main():
 
   input_images_count = 10
+  normal_data_process_images_count = 10
   RAG_k_nn = 1
   image_size = (224, 224)
   RAG_sentence_transformer_model = "CLIP-ViT-B-32"
@@ -276,7 +277,9 @@ def main():
   {normal_data_prompt}
 
   INSTRUCTION: 
-  Compare video represented by Images 1-{input_images_count} with the normal data images with indexes {input_images_count + 1} - {int(input_images_count + input_images_count*RAG_k_nn)}. 
+  Compare video represented by Images 1-{input_images_count} with the normal data images with indexes {input_images_count + 1} - {int(input_images_count + input_images_count*RAG_k_nn)}.
+  Images from index {int(input_images_count + input_images_count*RAG_k_nn) + 1} - {int(input_images_count + input_images_count*RAG_k_nn) + normal_data_process_images_count} illustrates the general process 
+  of a normally behaving process, which must also be taken into account when determining the normality of the input video sequence  
   If Image 1 differs significantly from the normal references in the ways described in the context, mark it as an anomaly.
   """
 
@@ -300,7 +303,11 @@ def main():
                       "data/DCM4_anomalies/normal_data/Video_index_17_viewport_0",
                       "data/DCM4_anomalies/normal_data/Video_index_18_viewport_0",
                       "data/DCM4_anomalies/normal_data/Video_index_19_viewport_0",]
-  
+
+
+
+
+
   video_input_path = "data/DCM4_anomalies/normal_data/Video_index_10_viewport_0"
 
   # Clean up the data storage before running.
@@ -321,6 +328,30 @@ def main():
   # anomaly_detector._rag_obj.save_database_to_path("RAG_data/normal_data.pkl", save_raw_images=True)
 
   anomaly_detector._rag_obj.load_database_from_path("RAG_data/normal_data.pkl")
+  
+  
+  # Load normal video process sequence
+  normal_sequency_video_path = "data/DCM4_anomalies/normal_data/Video_index_0_viewport_0"
+  normal_video_process_subsambled = []
+
+  vid_obj.clear_data()
+  vid_obj.load_images_from_path(normal_sequency_video_path)
+  normal_process_video_images = vid_obj._data # list of video_images
+
+  normal_video_process_subsambled.append(normal_process_video_images[0])
+
+  indx_skip = len(normal_process_video_images)//normal_data_process_images_count
+
+  start_index = 0 + int(indx_skip//1.5) # Start in the middle of the video
+
+  for i in range(normal_data_process_images_count - 2):
+    normal_video_process_subsambled.append(normal_process_video_images[start_index])
+    start_index += indx_skip
+
+  normal_video_process_subsambled.append(normal_process_video_images[len(normal_process_video_images) - 1 ])
+
+  
+  
   # Load input video
   vid_obj.clear_data()
   vid_obj.load_images_from_path(video_input_path)
@@ -347,8 +378,8 @@ def main():
     output = anomaly_detector._rag_obj.run_RAG(im, k_nn=RAG_k_nn)
     RAG_images_list.append(output["images"][0])
 
-  # Combine input image with normal images
-  combined_images = target_input_images + RAG_images_list
+  # Combine input image, RAG retrieved normal images, and a static normal image video process
+  combined_images = target_input_images + RAG_images_list + normal_video_process_subsambled
 
 
 
@@ -361,7 +392,7 @@ def main():
 
 
   print(f"\n{'='*60}\n COMMITTING VERDICT\n{'='*60}")
-  print(f" Verdict:   {output["is_anomaly"]}")
+  print(f" anomaly detected:   {output["is_anomaly"]}")
   print(f" Category:  {output["anomaly_category"]}")
   print(f" Reasoning: {output["description"]}")
 
