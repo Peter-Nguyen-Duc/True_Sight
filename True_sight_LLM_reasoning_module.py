@@ -76,11 +76,14 @@ class true_sight_reasoning_framework:
 
       self._main_agent_role = role_name
 
+
+
+
   def preprocess_input(self, query, image_input):
 
 
     image_data = []
-
+    messages = []
 
     prompt = f"""
             ### role:
@@ -93,27 +96,76 @@ class true_sight_reasoning_framework:
               {query}
             """
 
+    # We use a list for 'content' to allow interleaving text and images
+    content_blocks = []
+    
+    # Add the initial text prompt
+    content_blocks.append({"type": "text", "text": prompt})
 
 
-    if isinstance(image_input, list):
-      for image in image_input:
-        image_data.append(self._get_image_data_from_input(image))
-    else:
-      image_data.append(self._get_image_data_from_input(image_input))
+    if isinstance(image_input, dict):
+      for group_name, images in image_input.items():
+        if not images:
+          continue
+
+        image_data_group = {"role": "user",}
+        image_data =  []
+
+        for im in images:
+          image_data.append(self._get_image_data_from_input(im))
+
+        # Add a text label block before the images of this group
+        label = f"\n--- {group_name.upper()} ---\n"
+
+        image_data_group["content"] = label
+        image_data_group["images"] = image_data
+        messages.append(image_data_group)
+    
+    # Fallback: If image_groups is still a list, we treat it as one big group
+    elif isinstance(image_input, list):
+        content_blocks.append({"type": "text", "text": "\n--- IMAGES ---\n"})
+
+        image_data =  []
+
+        for im in image_input:
+          image_data.append(self._get_image_data_from_input(im))
+
+        image_data_group = {"role": "user",}
+
+        # Add a text label block before the images of this group
+        label = f"\n--- IMAGES ---\n"
+
+        image_data_group["content"] = label
+        image_data_group["images"] = image_data
+        messages.append(image_data_group)
+    
+    # Fallback: Single image input
+    elif image_input is not None:
+        img_data = self._get_image_data_from_input(image_input)
+
+        image_data_group = {"role": "user",}
+
+        # Add a text label block before the images of this group
+        label = f"\n--- IMAGE ---\n"
+
+        image_data_group["content"] = label
+        image_data_group["images"] = [img_data]
+        messages.append(image_data_group)
 
 
+    # if isinstance(image_input, list):
+    #   for image in image_input:
+    #     image_data.append(self._get_image_data_from_input(image))
+    # else:
+    #   image_data.append(self._get_image_data_from_input(image_input))
 
 
-    if image_data == [None]:
-      messages = [{"role": "user", 
-                   "content": prompt}]
-    else:
-      messages = [{
-          "role": "user",
-          "content": prompt,
-          "images": image_data,     # <-- flat, parallel to content
-      }]
-  
+    prompt_message = {
+              "role": "user",
+              "content": prompt,    # <-- flat, parallel to content
+          }
+    messages.append(prompt_message)
+    
     return messages
 
 
@@ -432,7 +484,7 @@ class self_reflective_single_agent(true_sight_reasoning_framework):
     # Loop for reflection and regeneration
     for i in range(max_reflections):
 
-      is_approved, reasoning = self.get_reflective_agent_input(message=query, response=response)
+      is_approved, reasoning = self.get_reflective_agent_input(message=messages, response=response)
 
       if is_approved:
         break
@@ -440,7 +492,7 @@ class self_reflective_single_agent(true_sight_reasoning_framework):
       feedback_prompt = f"Your previous response was: {response}\n\nCritique: {reasoning}\n\nPlease regenerate the response addressing these points."
       messages.append({"role": "user", "content": feedback_prompt})
       
-      response = self.call_main_agent(query=messages)
+      response = self.call_main_agent(query=messages, variable_constrain=variable_constrain)
         
     return response
 

@@ -18,7 +18,6 @@ This class lists all tools that the True sight Reasoning module can use to solve
 @log_decorator(logging.INFO)
 def check_arguments_valid(arguments_dict: dict, response: ChatResponse):
 
-
   if response.message.tool_calls:
     first_call = response.message.tool_calls[0]
 
@@ -102,6 +101,7 @@ def variable_constrained_prompt(message, variable_dict: dict, model_name: str):
   response_rejected = True
   max_tries = 3
   iters = 0
+  error_cause = []
 
   while response_rejected:
     variable_constrain_tool = generate_dynamic_tool(variable_dict)
@@ -114,18 +114,32 @@ def variable_constrained_prompt(message, variable_dict: dict, model_name: str):
       options={"num_ctx": 32768},
     )
 
+    is_truncated = getattr(response, 'finish_reason', None) == "length" 
+    
+    argument_invalid = not(check_arguments_valid(arguments_dict=variable_dict, response=response))
 
-    if not(check_arguments_valid(arguments_dict=variable_dict, response=response)):
-      error_msg = (
-          f"ERROR: The tool call was rejected because it did not contain the required variables. "
-          f"You MUST pass the following arguments to the tool 'TOOL_determine_image_anomality': {variable_dict}"
-      )
-      current_messages.append({"role": "user", "content": error_msg})
+    if argument_invalid or is_truncated:
+
+      if argument_invalid:
+        error_msg = (
+            f"ERROR: The tool call was rejected because it did not contain the required variables. "
+            f"You MUST pass the following arguments to the tool 'TOOL_determine_image_anomality': {variable_dict}"
+        )
+        current_messages.append({"role": "user", "content": error_msg})
+        error_cause.append("invalid function structure")
+
+      if is_truncated:
+        error_msg = (
+                    "ERROR: Your previous response was cut off because it was too long. "
+                    "Please be more concise both in prompt and in the thinking phase"
+        )
+        current_messages.append({"role": "user", "content": error_msg})
+        error_cause.append("Token count limit reached")
 
       iters += 1
 
       if iters > max_tries:
-        raise Exception(f"ERROR: Model could not follow the format, after {max_tries} re-evaluations!")
+        raise Exception(f"ERROR: Model could not follow the format, after {max_tries} re-evaluations! the following issues was logged: {error_cause} ")
       
     else:
       response_rejected = False

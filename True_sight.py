@@ -19,6 +19,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from agent_tools import check_arguments_valid
+import copy
 
 
 @log_decorator(logging.INFO)
@@ -230,6 +231,8 @@ def main():
   anomaly_detector = True_sight_interfacer(reasoning_module=reasoning_module, RAG_sentence_transformer_model=RAG_sentence_transformer_model, image_size=image_size)
   
 
+
+
   prompt = f"Use the given function call, to give me an anomaly report on the video sequence represented by the {input_images_count} first images on image input."
 
   task_prompt = "TASK: Analyze the provided image for anomalies. Compare the target images against the provided 'Normal' reference images."
@@ -254,17 +257,23 @@ def main():
 
                           Anomalous behavior could be exemplified as:
                           - The part has been pushed of the linear feeder vertical to the part movement direction, due to the previous movements, when falling of the ramp (post-track rejection)
+                             -  To mark the object with anomaly post_trap rejection, the roundsplate lego part must clearly be off the linear track boundary, in such a way, that some of 
+                                the object pixels are non-overlapping with the linear feeder. Post-track rejection in constrast to pre-trap rejection stems from visual indication that the 
+                                part was pushed off the track on the right side of the ramp of the linear feeder.
                           - The part has been pushed of the linear feeder vertical to the part movement direction, prior to falling of the ramp (pre-trap rejection)
+                             -  As with post trap rejection but in this case, the part must have visual indication that the part was pushed off, before entering the trap ramp.
                           - trap rejection means that the object has been or is amidst of being pushed off the track entirely, while movement parallel to the track direction is expected.
                           - It is an anomaly if there are any indications that the part is orientented in such a way, that it seems to be falling off the track. 
 
                           There are more anomalous behaviors than these examples, so watch out for all behavior that does not adhere to the normal process.
 
-                          
+                        
                               ***Normal data description***:
+                          Two sets of normal data will be given. The first set of normal images are RAG retrieved normal data instances. They dont have any specific order, and are 
+                          simply semantically adjacent to the input images. The next set of images is a single normal video sequence, which follows the normal procedure.
                           The following normal data images are RAG retrieved semantically adjacent images of the image depicting the process that is been conducted.
                           The images only represent static information, such as position of part in relation to the linear feeder. Thereefore it is solely the position of the object, 
-                          that should be used to determine the anomality of the object 
+                          that should be used to determine the anomality of the object.
                           """
 
   full_prompt = f"""
@@ -277,10 +286,11 @@ def main():
   {normal_data_prompt}
 
   INSTRUCTION: 
-  Compare video represented by Images 1-{input_images_count} with the normal data images with indexes {input_images_count + 1} - {int(input_images_count + input_images_count*RAG_k_nn)}.
+  Compare video represented by Images 1-{input_images_count} with the RAG retrieved normal data images with indexes {input_images_count + 1} - {int(input_images_count + input_images_count*RAG_k_nn)}. Note, 
+  that the RAG retrieved images are not following any particular order, but are simply images that are semantically close to the input images. 
   Images from index {int(input_images_count + input_images_count*RAG_k_nn) + 1} - {int(input_images_count + input_images_count*RAG_k_nn) + normal_data_process_images_count} illustrates the general process 
   of a normally behaving process, which must also be taken into account when determining the normality of the input video sequence  
-  If Image 1 differs significantly from the normal references in the ways described in the context, mark it as an anomaly.
+  If Image 1-{input_images_count}  differs significantly from the normal references in the ways described in the context, mark it as an anomaly.
   """
 
 
@@ -308,8 +318,6 @@ def main():
 
 
 
-  video_input_path = "data/DCM4_anomalies/normal_data/Video_index_10_viewport_0"
-
   # Clean up the data storage before running.
   if anomaly_detector._rag_obj != None: anomaly_detector._rag_obj.clear_database()
   if anomaly_detector._vid_obj != None: anomaly_detector._vid_obj.clear_data()
@@ -335,7 +343,7 @@ def main():
   normal_video_process_subsambled = []
 
   vid_obj.clear_data()
-  vid_obj.load_images_from_path(normal_sequency_video_path)
+  vid_obj.load_images_from_path(normal_sequency_video_path, target_size=image_size)
   normal_process_video_images = vid_obj._data # list of video_images
 
   normal_video_process_subsambled.append(normal_process_video_images[0])
@@ -352,10 +360,12 @@ def main():
 
   
   
+  video_input_path = "data/DCM4_anomalies/post_trap_rejection/Video_index_4_viewport_0"
+
   # Load input video
   vid_obj.clear_data()
-  vid_obj.load_images_from_path(video_input_path)
-  video_images = vid_obj._data # list of video_images
+  vid_obj.load_images_from_path(video_input_path, target_size=image_size)
+  video_images = copy.deepcopy(vid_obj._data) # list of video_images
 
   target_input_images = []
 
@@ -365,11 +375,16 @@ def main():
 
   start_index = 0 + int(indx_skip//1.5) # Start in the middle of the video
 
+
+
   for i in range(input_images_count - 2):
+
     target_input_images.append(video_images[start_index])
     start_index += indx_skip
 
   target_input_images.append(video_images[len(video_images) - 1 ])
+
+
 
 
   # Get RAG image retrieval
@@ -379,7 +394,12 @@ def main():
     RAG_images_list.append(output["images"][0])
 
   # Combine input image, RAG retrieved normal images, and a static normal image video process
-  combined_images = target_input_images + RAG_images_list + normal_video_process_subsambled
+  combined_images = {}
+  target_input_images, RAG_images_list, normal_video_process_subsambled
+
+  combined_images["input images"] = target_input_images
+  combined_images["RAG"] = RAG_images_list
+  combined_images["sub_sampled_normal_video_process"] = normal_video_process_subsambled
 
 
 

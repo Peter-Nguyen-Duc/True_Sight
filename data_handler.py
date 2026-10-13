@@ -84,6 +84,9 @@ class video_data_handler:
     """
 
     files = [join(path, f) for f in listdir(path) if isfile(join(path, f)) and (get_file_extension(join(path, f)) == ".png" or get_file_extension(join(path, f)) == ".jpg")] 
+   
+    # 2. SORT the files lexicographically
+    files = sorted(files)
 
     for file in files:
       im = self.load_single_image_from_path(path=file, target_size=target_size)
