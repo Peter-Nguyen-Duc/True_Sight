@@ -32,7 +32,26 @@ def plt_image(target_image):
     plt.show()
 
 
+def plot_images(images, title_name):
+  for i, im in enumerate(images):
+    # 2. Get the image we JUST appended (the last one in the list)
+    img = np.asarray(im)
 
+    # 3. Normalize the image for visualization
+    # If it's a float array (0.0 to 1.0), convert it to 0-255 uint8
+    if img.dtype != np.uint8:
+        if img.max() <= 1.1: # Check if it's in 0-1 range
+            img = (img * 255).astype(np.uint8)
+        else:
+            img = img.astype(np.uint8)
+
+    # 4. USE imshow instead of imread
+    plt.figure(figsize=(5, 5)) # Create a window for each image
+    plt.imshow(img)            # Display the numpy array
+    plt.title(f"{title_name} --- Frame Index: {i}")
+    plt.axis('off')           # Hide the axis numbers for a cleaner look
+    plt.tight_layout()
+    plt.show()
 
 @decorate_all_class_methods
 class True_sight_interfacer:
@@ -286,11 +305,11 @@ def main():
   {normal_data_prompt}
 
   INSTRUCTION: 
-  Compare video represented by Images 1-{input_images_count} with the RAG retrieved normal data images with indexes {input_images_count + 1} - {int(input_images_count + input_images_count*RAG_k_nn)}. Note, 
+  Compare video represented with labels --- input images --- with the RAG retrieved normal data images labeled --- RAG ---. Note, 
   that the RAG retrieved images are not following any particular order, but are simply images that are semantically close to the input images. 
-  Images from index {int(input_images_count + input_images_count*RAG_k_nn) + 1} - {int(input_images_count + input_images_count*RAG_k_nn) + normal_data_process_images_count} illustrates the general process 
-  of a normally behaving process, which must also be taken into account when determining the normality of the input video sequence  
-  If Image 1-{input_images_count}  differs significantly from the normal references in the ways described in the context, mark it as an anomaly.
+  The images under --- sub_sampled_normal_video_process --- represents aa normally behaving process, which must also be taken into account when 
+  determining the normality of the input video sequence If Images with the labels --- input images --- differs significantly from the normal 
+  references in the ways described in the context, mark it as an anomaly.
   """
 
 
@@ -345,12 +364,13 @@ def main():
   vid_obj.clear_data()
   vid_obj.load_images_from_path(normal_sequency_video_path, target_size=image_size)
   normal_process_video_images = vid_obj._data # list of video_images
+  normal_process_video_images = normal_process_video_images[:-1]
 
   normal_video_process_subsambled.append(normal_process_video_images[0])
 
   indx_skip = len(normal_process_video_images)//normal_data_process_images_count
 
-  start_index = 0 + int(indx_skip//1.5) # Start in the middle of the video
+  start_index = 0 + int(indx_skip) # Start in the middle of the video
 
   for i in range(normal_data_process_images_count - 2):
     normal_video_process_subsambled.append(normal_process_video_images[start_index])
@@ -360,7 +380,7 @@ def main():
 
   
   
-  video_input_path = "data/DCM4_anomalies/post_trap_rejection/Video_index_4_viewport_0"
+  video_input_path = "data/DCM4_anomalies/pre_trap_rejection/Video_index_3_viewport_0"
 
   # Load input video
   vid_obj.clear_data()
@@ -375,14 +395,34 @@ def main():
 
   start_index = 0 + int(indx_skip//1.5) # Start in the middle of the video
 
-
-
   for i in range(input_images_count - 2):
 
     target_input_images.append(video_images[start_index])
     start_index += indx_skip
 
   target_input_images.append(video_images[len(video_images) - 1 ])
+
+
+
+  # for i, im in enumerate(target_input_images):
+  #   # 2. Get the image we JUST appended (the last one in the list)
+  #   img = np.asarray(im)
+
+  #   # 3. Normalize the image for visualization
+  #   # If it's a float array (0.0 to 1.0), convert it to 0-255 uint8
+  #   if img.dtype != np.uint8:
+  #       if img.max() <= 1.1: # Check if it's in 0-1 range
+  #           img = (img * 255).astype(np.uint8)
+  #       else:
+  #           img = img.astype(np.uint8)
+
+  #   # 4. USE imshow instead of imread
+  #   plt.figure(figsize=(5, 5)) # Create a window for each image
+  #   plt.imshow(img)            # Display the numpy array
+  #   plt.title(f"Frame Index: {i}")
+  #   plt.axis('off')           # Hide the axis numbers for a cleaner look
+  #   plt.tight_layout()
+  #   plt.show()
 
 
 
@@ -400,6 +440,12 @@ def main():
   combined_images["input images"] = target_input_images
   combined_images["RAG"] = RAG_images_list
   combined_images["sub_sampled_normal_video_process"] = normal_video_process_subsambled
+
+  plot_images(combined_images["input images"], "input_images")
+  plot_images(combined_images["RAG"], "RAG")
+  plot_images(combined_images["sub_sampled_normal_video_process"], "sub_sampled_normal_video_process")
+  
+
 
 
 
