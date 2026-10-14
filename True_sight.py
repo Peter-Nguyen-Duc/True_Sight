@@ -20,7 +20,8 @@ import matplotlib.pyplot as plt
 
 from agent_tools import check_arguments_valid
 import copy
-
+import os 
+import json
 
 @log_decorator(logging.INFO)
 def plt_image(target_image):
@@ -34,6 +35,8 @@ def plt_image(target_image):
 
 def plot_images(images, title_name):
   for i, im in enumerate(images):
+    if i < 7:
+      continue
     # 2. Get the image we JUST appended (the last one in the list)
     img = np.asarray(im)
 
@@ -138,6 +141,39 @@ class True_sight_interfacer:
 
 
 
+  def generate_normal_database(self, normal_data_path_list, image_size, save_path="RAG_data/normal_data.pkl"):
+    # Load normal data into vid object, pass vid_object data into the RAG tool to create a vectorization of the images and save it 
+
+    # normal_data_path_list = ["data/DCM4_anomalies/normal_data/Video_index_0_viewport_0",
+    #                     "data/DCM4_anomalies/normal_data/Video_index_1_viewport_0",
+    #                     "data/DCM4_anomalies/normal_data/Video_index_2_viewport_0",
+    #                     "data/DCM4_anomalies/normal_data/Video_index_3_viewport_0",
+    #                     "data/DCM4_anomalies/normal_data/Video_index_4_viewport_0",
+    #                     "data/DCM4_anomalies/normal_data/Video_index_5_viewport_0",
+    #                     "data/DCM4_anomalies/normal_data/Video_index_6_viewport_0",
+    #                     "data/DCM4_anomalies/normal_data/Video_index_7_viewport_0",
+    #                     "data/DCM4_anomalies/normal_data/Video_index_8_viewport_0",
+    #                     "data/DCM4_anomalies/normal_data/Video_index_9_viewport_0",
+    #                     "data/DCM4_anomalies/normal_data/Video_index_11_viewport_0",
+    #                     "data/DCM4_anomalies/normal_data/Video_index_12_viewport_0",
+    #                     "data/DCM4_anomalies/normal_data/Video_index_13_viewport_0",
+    #                     "data/DCM4_anomalies/normal_data/Video_index_14_viewport_0",
+    #                     "data/DCM4_anomalies/normal_data/Video_index_15_viewport_0",
+    #                     "data/DCM4_anomalies/normal_data/Video_index_16_viewport_0",
+    #                     "data/DCM4_anomalies/normal_data/Video_index_17_viewport_0",
+    #                     "data/DCM4_anomalies/normal_data/Video_index_18_viewport_0",
+    #                     "data/DCM4_anomalies/normal_data/Video_index_19_viewport_0",]
+
+    
+    vid_obj = video_data_handler()
+
+    for normal_data_path in normal_data_path_list:
+      vid_obj.load_images_from_path(path=normal_data_path, target_size=image_size)
+
+    # give normal data to rag_obj to create the RAG database
+    self._rag_obj.append_to_database(vid_obj._data)
+    self._rag_obj.initialize_KD_tree()
+    self._rag_obj.save_database_to_path(save_path, save_raw_images=True)
 
   def single_image_AD(self, vid_path, input_image_path, k_nn, image_size, prompt):
 
@@ -234,12 +270,177 @@ class True_sight_interfacer:
 
 
 
+  def video_AD(self, video_input_path, image_size, subsambled_input_images, normal_data_path="RAG_data/normal_data.pkl"):
+
+
+
+    input_images_count = subsambled_input_images
+    normal_data_process_images_count = 10
+    RAG_k_nn = 1
+
+    normal_video_demonstration = "data/DCM4_anomalies/normal_data/Video_index_0_viewport_0"
+    prompt = f"Use the given function call, to give me an anomaly report on the video sequence represented by the {input_images_count} first images on image input."
+
+
+    task_prompt = "TASK: Analyze the provided image for anomalies. Compare the target images against the provided 'Normal' reference images."
+        
+    normal_data_prompt = """
+                              ***Normal process behavior***:
+                            This process is a linear vibration feeding simulation, the linear track (large grey rectangular object) 
+                            is vibrating at a frequency where the object seems still in space, but the effect is apparent on the 
+                            object on the track which is moving forward.
+
+                            The intention is for the object to move nigh unhindered from the left side of the track to the right.
+                            The obejct is to pass across the part trap, which is the large ramp seen in the middle of the track.
+                            All anomalous and normal behavior is solely determined based on the actions of the part on the track,
+                            which in our case is a lego roundplate. The normal process of the roundplate part is as follows: 
+                            - move towards the ramp
+                            - Climb the ramp unhindered
+                            - Fall off the ledge onto the right side of the ramp linear feeder
+                            - Move forwards on the linear feeder
+                            - As long as the roundplate is still on the track, then no anomalies has occured. 
+                            - Movement of the object cannot be used for argumentation, since the images does not capture directional information. 
+                            
+
+                            Anomalous behavior could be exemplified as:
+                            - The part has been pushed of the linear feeder vertical to the part movement direction, due to the previous movements, when falling of the ramp (post-track rejection)
+                              -  To mark the object with anomaly post_trap rejection, the roundsplate lego part must clearly be off the linear track boundary, in such a way, that some of 
+                                  the object pixels are non-overlapping with the linear feeder. Post-track rejection in constrast to pre-trap rejection stems from visual indication that the 
+                                  part was pushed off the track on the right side of the ramp of the linear feeder.
+                            - The part has been pushed of the linear feeder vertical to the part movement direction, prior to falling of the ramp (pre-trap rejection)
+                              -  As with post trap rejection but in this case, the part must have visual indication that the part was pushed off, before entering the trap ramp.
+                            - trap rejection means that the object has been or is amidst of being pushed off the track entirely, while movement parallel to the track direction is expected.
+                            - It is an anomaly if there are any indications that the part is orientented in such a way, that it seems to be falling off the track. 
+
+                            There are more anomalous behaviors than these examples, so watch out for all behavior that does not adhere to the normal process.
+
+                          
+                                ***Normal data description***:
+                            Two sets of normal data will be given. The first set of normal images are RAG retrieved normal data instances. They dont have any specific order, and are 
+                            simply semantically adjacent to the input images. The next set of images is a single normal video sequence, which follows the normal procedure.
+                            The following normal data images are RAG retrieved semantically adjacent images of the image depicting the process that is been conducted.
+                            The images only represent static information, such as position of part in relation to the linear feeder. Thereefore it is solely the position of the object, 
+                            that should be used to determine the anomality of the object.
+                            """
+
+    full_prompt = f"""
+    {task_prompt}
+
+    USER QUERY: 
+    {prompt}
+
+    NORMAL DATA DESCRIPTION:
+    {normal_data_prompt}
+
+    INSTRUCTION: 
+    Compare video represented with labels --- input images --- with the RAG retrieved normal data images labeled --- RAG ---. Note, 
+    that the RAG retrieved images are not following any particular order, but are simply images that are semantically close to the input images. 
+    The images under --- sub_sampled_normal_video_process --- represents aa normally behaving process, which must also be taken into account when 
+    determining the normality of the input video sequence If Images with the labels --- input images --- differs significantly from the normal 
+    references in the ways described in the context, mark it as an anomaly.
+    """
+
+
+
+
+
+
+
+    # Clean up the data storage before running.
+    if self._rag_obj != None: self._rag_obj.clear_database()
+    if self._vid_obj != None: self._vid_obj.clear_data()
+    if self._reasoning_module != None: self._reasoning_module.clear_all_tools()
+
+    self._rag_obj.load_database_from_path(normal_data_path)
+    
+    
+    # Load normal video process sequence
+    normal_sequence_video_path = normal_video_demonstration
+    normal_video_process_subsambled = []
+
+    vid_obj = video_data_handler()
+    vid_obj.load_images_from_path(normal_sequence_video_path, target_size=image_size)
+    normal_process_video_images = vid_obj._data # list of video_images
+
+    normal_video_process_subsambled.append(normal_process_video_images[0])
+
+    indx_skip = len(normal_process_video_images)//normal_data_process_images_count
+
+    start_index = 0 + int(indx_skip) # Start in the middle of the video
+
+    for i in range(normal_data_process_images_count - 2):
+      normal_video_process_subsambled.append(normal_process_video_images[start_index])
+      start_index += indx_skip
+
+    normal_video_process_subsambled.append(normal_process_video_images[len(normal_process_video_images) - 1 ])
+
+    
+    # Load input video
+
+    vid_obj.clear_data()
+    vid_obj.load_images_from_path(video_input_path, target_size=image_size)
+    video_images = copy.deepcopy(vid_obj._data) # list of video_images
+    video_images = video_images[:-1]
+    target_input_images = []
+
+    target_input_images.append(video_images[0])
+
+    indx_skip = len(video_images)//input_images_count
+
+    start_index = 0 + int(indx_skip//1.5) # Start in the middle of the video
+
+    for i in range(input_images_count - 2):
+
+      target_input_images.append(video_images[start_index])
+      start_index += indx_skip
+
+    target_input_images.append(video_images[len(video_images) - 1 ])
+
+    #plot_images(target_input_images, "new normal data")
+
+    # Get RAG image retrieval
+    RAG_images_list = []
+    for im in target_input_images:
+      output = self._rag_obj.run_RAG(im, k_nn=RAG_k_nn)
+      RAG_images_list.append(output["images"][0])
+
+    # Combine input image, RAG retrieved normal images, and a static normal image video process
+    combined_images = {}
+    target_input_images, RAG_images_list, normal_video_process_subsambled
+
+    combined_images["input images"] = target_input_images
+    combined_images["RAG"] = RAG_images_list
+    combined_images["sub_sampled_normal_video_process"] = normal_video_process_subsambled
+
+    # plot_images(combined_images["input images"], "input_images")
+    # plot_images(combined_images["RAG"], "RAG")
+    # plot_images(combined_images["sub_sampled_normal_video_process"], "sub_sampled_normal_video_process")
+    
+
+
+
+
+    # Generate variable constrain for prompt
+    variable_constrain = {"is_anomaly": bool, 
+                          "anomaly_category": str,
+                          "description": str,}
+
+    output = self._reasoning_module.run_framework(query=full_prompt, image_input=combined_images, variable_constrain=variable_constrain)
+
+    print(f"\n{'='*60}\n COMMITTING VERDICT\n{'='*60}")
+    print(f" anomaly detected:   {output["is_anomaly"]}")
+    print(f" Category:  {output["anomaly_category"]}")
+    print(f" Reasoning: {output["description"]}")
+
+    return output["is_anomaly"], output["anomaly_category"], output["description"]
+
+
+
+
 @log_decorator(logging.INFO)
 def main():
 
-  input_images_count = 10
-  normal_data_process_images_count = 10
-  RAG_k_nn = 1
+
   image_size = (224, 224)
   RAG_sentence_transformer_model = "CLIP-ViT-B-32"
 
@@ -248,222 +449,40 @@ def main():
   reasoning_module = self_reflective_single_agent()
 
   anomaly_detector = True_sight_interfacer(reasoning_module=reasoning_module, RAG_sentence_transformer_model=RAG_sentence_transformer_model, image_size=image_size)
-  
+
+  get_list_of_datasets = "test_dataset.txt"
+
+  with open(get_list_of_datasets, 'r') as f:
+    paths = sorted([x.strip() for x in f.readlines()])
 
 
+  for path in paths:
+    # Iterate through every item inside the parent folder
+    results_list = []
 
-  prompt = f"Use the given function call, to give me an anomaly report on the video sequence represented by the {input_images_count} first images on image input."
+    for subfolder in os.listdir(path):
+      full_subfolder_path = os.path.join(path, subfolder)
 
-  task_prompt = "TASK: Analyze the provided image for anomalies. Compare the target images against the provided 'Normal' reference images."
-      
-  normal_data_prompt = """
-                            ***Normal process behavior***:
-                          This process is a linear vibration feeding simulation, the linear track (large grey rectangular object) 
-                          is vibrating at a frequency where the object seems still in space, but the effect is apparent on the 
-                          object on the track which is moving forward.
+      # Ensure we are only processing directories (ignoring files like .DS_Store or .txt)
 
-                          The intention is for the object to move nigh unhindered from the left side of the track to the right.
-                          The obejct is to pass across the part trap, which is the large ramp seen in the middle of the track.
-                          All anomalous and normal behavior is solely determined based on the actions of the part on the track,
-                          which in our case is a lego roundplate. The normal process of the roundplate part is as follows: 
-                          - move towards the ramp
-                          - Climb the ramp unhindered
-                          - Fall off the ledge onto the right side of the ramp linear feeder
-                          - Move forwards on the linear feeder
-                          - As long as the roundplate is still on the track, then no anomalies has occured. 
-                          - Movement of the object cannot be used for argumentation, since the images does not capture directional information. 
-                          
+      if os.path.isdir(full_subfolder_path):
+        results = anomaly_detector.video_AD(
+            video_input_path=full_subfolder_path, 
+            subsambled_input_images=10, 
+            image_size=image_size
+        )
 
-                          Anomalous behavior could be exemplified as:
-                          - The part has been pushed of the linear feeder vertical to the part movement direction, due to the previous movements, when falling of the ramp (post-track rejection)
-                             -  To mark the object with anomaly post_trap rejection, the roundsplate lego part must clearly be off the linear track boundary, in such a way, that some of 
-                                the object pixels are non-overlapping with the linear feeder. Post-track rejection in constrast to pre-trap rejection stems from visual indication that the 
-                                part was pushed off the track on the right side of the ramp of the linear feeder.
-                          - The part has been pushed of the linear feeder vertical to the part movement direction, prior to falling of the ramp (pre-trap rejection)
-                             -  As with post trap rejection but in this case, the part must have visual indication that the part was pushed off, before entering the trap ramp.
-                          - trap rejection means that the object has been or is amidst of being pushed off the track entirely, while movement parallel to the track direction is expected.
-                          - It is an anomaly if there are any indications that the part is orientented in such a way, that it seems to be falling off the track. 
-
-                          There are more anomalous behaviors than these examples, so watch out for all behavior that does not adhere to the normal process.
-
-                        
-                              ***Normal data description***:
-                          Two sets of normal data will be given. The first set of normal images are RAG retrieved normal data instances. They dont have any specific order, and are 
-                          simply semantically adjacent to the input images. The next set of images is a single normal video sequence, which follows the normal procedure.
-                          The following normal data images are RAG retrieved semantically adjacent images of the image depicting the process that is been conducted.
-                          The images only represent static information, such as position of part in relation to the linear feeder. Thereefore it is solely the position of the object, 
-                          that should be used to determine the anomality of the object.
-                          """
-
-  full_prompt = f"""
-  {task_prompt}
-
-  USER QUERY: 
-  {prompt}
-
-  NORMAL DATA DESCRIPTION:
-  {normal_data_prompt}
-
-  INSTRUCTION: 
-  Compare video represented with labels --- input images --- with the RAG retrieved normal data images labeled --- RAG ---. Note, 
-  that the RAG retrieved images are not following any particular order, but are simply images that are semantically close to the input images. 
-  The images under --- sub_sampled_normal_video_process --- represents aa normally behaving process, which must also be taken into account when 
-  determining the normality of the input video sequence If Images with the labels --- input images --- differs significantly from the normal 
-  references in the ways described in the context, mark it as an anomaly.
-  """
+        results_list.append(results)
 
 
-  normal_data_path_list = ["data/DCM4_anomalies/normal_data/Video_index_0_viewport_0",
-                      "data/DCM4_anomalies/normal_data/Video_index_1_viewport_0",
-                      "data/DCM4_anomalies/normal_data/Video_index_2_viewport_0",
-                      "data/DCM4_anomalies/normal_data/Video_index_3_viewport_0",
-                      "data/DCM4_anomalies/normal_data/Video_index_4_viewport_0",
-                      "data/DCM4_anomalies/normal_data/Video_index_5_viewport_0",
-                      "data/DCM4_anomalies/normal_data/Video_index_6_viewport_0",
-                      "data/DCM4_anomalies/normal_data/Video_index_7_viewport_0",
-                      "data/DCM4_anomalies/normal_data/Video_index_8_viewport_0",
-                      "data/DCM4_anomalies/normal_data/Video_index_9_viewport_0",
-                      "data/DCM4_anomalies/normal_data/Video_index_11_viewport_0",
-                      "data/DCM4_anomalies/normal_data/Video_index_12_viewport_0",
-                      "data/DCM4_anomalies/normal_data/Video_index_13_viewport_0",
-                      "data/DCM4_anomalies/normal_data/Video_index_14_viewport_0",
-                      "data/DCM4_anomalies/normal_data/Video_index_15_viewport_0",
-                      "data/DCM4_anomalies/normal_data/Video_index_16_viewport_0",
-                      "data/DCM4_anomalies/normal_data/Video_index_17_viewport_0",
-                      "data/DCM4_anomalies/normal_data/Video_index_18_viewport_0",
-                      "data/DCM4_anomalies/normal_data/Video_index_19_viewport_0",]
+    # 2. Create the JSON filename based on the folder name (last part of the path)
+    json_filename = f"{os.path.basename(path)}.json"
 
+    # 3. Save the results to the JSON file
+    with open(json_filename, 'w') as json_file:
+        json.dump(results_list, json_file, indent=4)
 
-
-
-
-  # Clean up the data storage before running.
-  if anomaly_detector._rag_obj != None: anomaly_detector._rag_obj.clear_database()
-  if anomaly_detector._vid_obj != None: anomaly_detector._vid_obj.clear_data()
-  if anomaly_detector._reasoning_module != None: anomaly_detector._reasoning_module.clear_all_tools()
-
-  vid_obj = video_data_handler()
-
-  # # Load normal data into vid object
-
-  # for normal_data_path in normal_data_path_list:
-  #   vid_obj.load_images_from_path(path=normal_data_path, target_size=image_size)
-
-  # # give normal data to rag_obj to create the RAG database
-  # anomaly_detector._rag_obj.append_to_database(vid_obj._data)
-  # anomaly_detector._rag_obj.initialize_KD_tree()
-  # anomaly_detector._rag_obj.save_database_to_path("RAG_data/normal_data.pkl", save_raw_images=True)
-
-  anomaly_detector._rag_obj.load_database_from_path("RAG_data/normal_data.pkl")
-  
-  
-  # Load normal video process sequence
-  normal_sequency_video_path = "data/DCM4_anomalies/normal_data/Video_index_0_viewport_0"
-  normal_video_process_subsambled = []
-
-  vid_obj.clear_data()
-  vid_obj.load_images_from_path(normal_sequency_video_path, target_size=image_size)
-  normal_process_video_images = vid_obj._data # list of video_images
-  normal_process_video_images = normal_process_video_images[:-1]
-
-  normal_video_process_subsambled.append(normal_process_video_images[0])
-
-  indx_skip = len(normal_process_video_images)//normal_data_process_images_count
-
-  start_index = 0 + int(indx_skip) # Start in the middle of the video
-
-  for i in range(normal_data_process_images_count - 2):
-    normal_video_process_subsambled.append(normal_process_video_images[start_index])
-    start_index += indx_skip
-
-  normal_video_process_subsambled.append(normal_process_video_images[len(normal_process_video_images) - 1 ])
-
-  
-  
-  video_input_path = "data/DCM4_anomalies/pre_trap_rejection/Video_index_3_viewport_0"
-
-  # Load input video
-  vid_obj.clear_data()
-  vid_obj.load_images_from_path(video_input_path, target_size=image_size)
-  video_images = copy.deepcopy(vid_obj._data) # list of video_images
-
-  target_input_images = []
-
-  target_input_images.append(video_images[0])
-
-  indx_skip = len(video_images)//input_images_count
-
-  start_index = 0 + int(indx_skip//1.5) # Start in the middle of the video
-
-  for i in range(input_images_count - 2):
-
-    target_input_images.append(video_images[start_index])
-    start_index += indx_skip
-
-  target_input_images.append(video_images[len(video_images) - 1 ])
-
-
-
-  # for i, im in enumerate(target_input_images):
-  #   # 2. Get the image we JUST appended (the last one in the list)
-  #   img = np.asarray(im)
-
-  #   # 3. Normalize the image for visualization
-  #   # If it's a float array (0.0 to 1.0), convert it to 0-255 uint8
-  #   if img.dtype != np.uint8:
-  #       if img.max() <= 1.1: # Check if it's in 0-1 range
-  #           img = (img * 255).astype(np.uint8)
-  #       else:
-  #           img = img.astype(np.uint8)
-
-  #   # 4. USE imshow instead of imread
-  #   plt.figure(figsize=(5, 5)) # Create a window for each image
-  #   plt.imshow(img)            # Display the numpy array
-  #   plt.title(f"Frame Index: {i}")
-  #   plt.axis('off')           # Hide the axis numbers for a cleaner look
-  #   plt.tight_layout()
-  #   plt.show()
-
-
-
-
-  # Get RAG image retrieval
-  RAG_images_list = []
-  for im in target_input_images:
-    output = anomaly_detector._rag_obj.run_RAG(im, k_nn=RAG_k_nn)
-    RAG_images_list.append(output["images"][0])
-
-  # Combine input image, RAG retrieved normal images, and a static normal image video process
-  combined_images = {}
-  target_input_images, RAG_images_list, normal_video_process_subsambled
-
-  combined_images["input images"] = target_input_images
-  combined_images["RAG"] = RAG_images_list
-  combined_images["sub_sampled_normal_video_process"] = normal_video_process_subsambled
-
-  plot_images(combined_images["input images"], "input_images")
-  plot_images(combined_images["RAG"], "RAG")
-  plot_images(combined_images["sub_sampled_normal_video_process"], "sub_sampled_normal_video_process")
-  
-
-
-
-
-  # Generate variable constrain for prompt
-  variable_constrain = {"is_anomaly": bool, 
-                        "anomaly_category": str,
-                        "description": str,}
-
-  output = anomaly_detector._reasoning_module.run_framework(query=full_prompt, image_input=combined_images, variable_constrain=variable_constrain)
-
-
-  print(f"\n{'='*60}\n COMMITTING VERDICT\n{'='*60}")
-  print(f" anomaly detected:   {output["is_anomaly"]}")
-  print(f" Category:  {output["anomaly_category"]}")
-  print(f" Reasoning: {output["description"]}")
-
-
-  return output["is_anomaly"], output["anomaly_category"], output["description"]
+    print(f"Saved results to {json_filename}")
 
 
 

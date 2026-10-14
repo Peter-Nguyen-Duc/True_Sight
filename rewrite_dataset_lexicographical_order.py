@@ -53,5 +53,5 @@ def list_of_videos_2_lexicographical_order(data_frames_path):
 
 if __name__ == '__main__':
 
-    data_frames_path = "data/DCM4_anomalies/stuck_on_track"
+    data_frames_path = "data/new_normal_data_DCM4"
     list_of_videos_2_lexicographical_order(data_frames_path=data_frames_path)
