@@ -1,0 +1,14 @@
+[
+    {
+        "is_anomaly": false,
+        "anomaly_category": "None",
+        "description": "The input video sequence shows a Lego roundplate traversing the linear feeder track, including a raised ramp section (part trap). The part remains aligned with the track and sitting on the surface, showing no signs of being pushed off vertically (pre-trap or post-track rejection). Its orientation and position are consistent with the expected normal process of moving unhindered across the ramp. This behavior is similar to the reference provided in SUB_SAMPLED_NORMAL_VIDEO_PROCESS where an object traverses a similar ramp structure without deviation.",
+        "video_path": "data/dummy_test/Video_index_1_viewport_0"
+    },
+    {
+        "is_anomaly": false,
+        "anomaly_category": "None",
+        "description": "The provided image sequence shows a roundplate (lego part) moving on a linear vibration feeder track. In the visible frames, specifically the last one, the roundplate is present and sitting on top of the gray track near the ramp/trap area. There are no visual indications of anomalous behavior such as the part being pushed off the track boundary, falling vertically, or rejection at the ramp (pre-trap or post-trap). The object appears to be in its expected position relative to the feeder geometry, adhering to the normal process description of moving from left to right.",
+        "video_path": "data/dummy_test/Video_index_0_viewport_0"
+    }
+]

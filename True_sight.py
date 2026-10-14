@@ -12,7 +12,7 @@ from agent_tools import True_sight_agent_toolbox
 
 from logging_decorator.decorator_logging import decorate_all_class_methods, log_decorator, generate_logger_file
 import logging
-generate_logger_file()
+# generate_logger_file()
 
 import cv2
 import numpy as np
@@ -341,15 +341,12 @@ class True_sight_interfacer:
     """
 
 
-
-
-
-
-
     # Clean up the data storage before running.
     if self._rag_obj != None: self._rag_obj.clear_database()
     if self._vid_obj != None: self._vid_obj.clear_data()
     if self._reasoning_module != None: self._reasoning_module.clear_all_tools()
+
+
 
     self._rag_obj.load_database_from_path(normal_data_path)
     
@@ -427,12 +424,8 @@ class True_sight_interfacer:
 
     output = self._reasoning_module.run_framework(query=full_prompt, image_input=combined_images, variable_constrain=variable_constrain)
 
-    print(f"\n{'='*60}\n COMMITTING VERDICT\n{'='*60}")
-    print(f" anomaly detected:   {output["is_anomaly"]}")
-    print(f" Category:  {output["anomaly_category"]}")
-    print(f" Reasoning: {output["description"]}")
 
-    return output["is_anomaly"], output["anomaly_category"], output["description"]
+    return output #output["is_anomaly"], output["anomaly_category"], output["description"]
 
 
 
@@ -440,11 +433,9 @@ class True_sight_interfacer:
 @log_decorator(logging.INFO)
 def main():
 
-
+  json_dataset_path = "output_data"
   image_size = (224, 224)
   RAG_sentence_transformer_model = "CLIP-ViT-B-32"
-
-
   # reasoning_module = single_agent_anomaly_detection_module()
   reasoning_module = self_reflective_single_agent()
 
@@ -466,11 +457,41 @@ def main():
       # Ensure we are only processing directories (ignoring files like .DS_Store or .txt)
 
       if os.path.isdir(full_subfolder_path):
-        results = anomaly_detector.video_AD(
-            video_input_path=full_subfolder_path, 
-            subsambled_input_images=10, 
-            image_size=image_size
-        )
+
+        try:
+          results = anomaly_detector.video_AD(
+              video_input_path=full_subfolder_path, 
+              subsambled_input_images=10, 
+              image_size=image_size
+              )
+
+        except Exception as e:
+            
+            del anomaly_detector
+            print("Re-initializing anomaly_detector...")
+            
+            # Re-setup the detector as requested
+            image_size = (224, 224)
+            RAG_sentence_transformer_model = "CLIP-ViT-B-32"
+            reasoning_module = self_reflective_single_agent()
+            
+            anomaly_detector = True_sight_interfacer(
+                reasoning_module=reasoning_module, 
+                RAG_sentence_transformer_model=RAG_sentence_transformer_model, 
+                image_size=image_size
+            )
+
+
+
+        results["video_path"] = full_subfolder_path
+
+
+        print(f"\n{'='*60}\n COMMITTING VERDICT\n{'='*60}")
+        print(f" video datapath: {results["video_path"]}")
+        print(f" anomaly detected:   {results["is_anomaly"]}")
+        print(f" Category:  {results["anomaly_category"]}")
+        print(f" Reasoning: {results["description"]}")
+
 
         results_list.append(results)
 
@@ -479,8 +500,8 @@ def main():
     json_filename = f"{os.path.basename(path)}.json"
 
     # 3. Save the results to the JSON file
-    with open(json_filename, 'w') as json_file:
-        json.dump(results_list, json_file, indent=4)
+    with open(json_dataset_path + "/" + json_filename, 'w') as json_file:
+      json.dump(results_list, json_file, indent=4)
 
     print(f"Saved results to {json_filename}")
 

@@ -11,7 +11,7 @@ from data_handler import video_data_handler
 
 from logging_decorator.decorator_logging import decorate_all_class_methods, log_decorator, generate_logger_file, ignore_logging
 import logging
-generate_logger_file()
+# generate_logger_file()
 
 
 import matplotlib.pyplot as plt

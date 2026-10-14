@@ -1,0 +1,6 @@
+{
+    "is_anomaly": true,
+    "anomaly_category": "post-track rejection",
+    "description": "The video sequence shows a lego roundplate moving along the linear feeder. The final image depicts the part being pushed off the left side of the track vertically, perpendicular to its intended direction of movement. This behavior matches the definition of post-track rejection where the object is ejected from the track in a manner other than continuing its forward motion.",
+    "video_path": "data/dummy_test/Video_index_0_viewport_0"
+}

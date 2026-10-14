@@ -22,7 +22,7 @@ from data_handler import video_data_handler
 
 from logging_decorator.decorator_logging import decorate_all_class_methods, log_decorator, generate_logger_file
 import logging
-generate_logger_file()
+# generate_logger_file()
 
 from agent_tools import check_arguments_valid, variable_constrained_prompt
 
