@@ -5,7 +5,7 @@ from RAG import RAG_image_interfacer, ImageVectorManager
 
 from data_handler import video_data_handler
 
-from True_sight_LLM_reasoning_module import single_agent_anomaly_detection_module, true_sight_reasoning_framework, self_reflective_single_agent
+from True_sight_LLM_reasoning_module import single_agent_anomaly_detection_module, true_sight_reasoning_framework, self_reflective_single_agent, voting_based_multi_agent
 
 from agent_tools import True_sight_agent_toolbox
 
@@ -435,85 +435,88 @@ class True_sight_interfacer:
 @log_decorator(logging.INFO)
 def test_dataset():
 
-  json_dataset_path = "output_data_single_agent"
+  # Test all created_reasoning modules
+  reasoning_modules_dict = {}
+
+  reasoning_modules_dict["single_agent"] = single_agent_anomaly_detection_module()
+  reasoning_modules_dict["reflective_agent"] = self_reflective_single_agent()
+  reasoning_modules_dict["voting_based_multi_Agent"] = voting_based_multi_agent()
+
+
+
   image_size = (224, 224)
   RAG_sentence_transformer_model = "CLIP-ViT-B-32"
-  # reasoning_module = single_agent_anomaly_detection_module()
-  reasoning_module = single_agent_anomaly_detection_module()
 
-  anomaly_detector = True_sight_interfacer(reasoning_module=reasoning_module, RAG_sentence_transformer_model=RAG_sentence_transformer_model, image_size=image_size)
+  # reasoning_module = single_agent_anomaly_detection_module()
 
   get_list_of_datasets = "dataset.txt"
-
 
 
   with open(get_list_of_datasets, 'r') as f:
     paths = sorted([x.strip() for x in f.readlines()])
 
+  for module_name, module in reasoning_modules_dict.items():
+    anomaly_detector = True_sight_interfacer(reasoning_module=module, RAG_sentence_transformer_model=RAG_sentence_transformer_model, image_size=image_size)
 
-  for path in paths:
-    # Iterate through every item inside the parent folder
-    results_list = []
+    for path in paths:
+      # Iterate through every item inside the parent folder
+      results_list = []
 
-    for subfolder in os.listdir(path):
-      full_subfolder_path = os.path.join(path, subfolder)
+      for subfolder in os.listdir(path):
+        full_subfolder_path = os.path.join(path, subfolder)
 
-      # Ensure we are only processing directories (ignoring files like .DS_Store or .txt)
+        # Ensure we are only processing directories (ignoring files like .DS_Store or .txt)
 
-      if os.path.isdir(full_subfolder_path):
+        if os.path.isdir(full_subfolder_path):
 
-        results_empty = True
-        while results_empty:
+          results_empty = True
+          while results_empty:
 
-          try:
+            try:
 
-            results = anomaly_detector.video_AD(
-                video_input_path=full_subfolder_path, 
-                subsambled_input_images=10, 
-                image_size=image_size
-                )
-            
-            results_empty = False
-
-          except Exception as e:
+              results = anomaly_detector.video_AD(
+                  video_input_path=full_subfolder_path, 
+                  subsambled_input_images=10, 
+                  image_size=image_size
+                  )
               
-            del anomaly_detector
-            print("Re-initializing anomaly_detector...")
-            
-            # Re-setup the detector as requested
-            image_size = (224, 224)
-            RAG_sentence_transformer_model = "CLIP-ViT-B-32"
-            reasoning_module = self_reflective_single_agent()
-            
-            anomaly_detector = True_sight_interfacer(
-                reasoning_module=reasoning_module, 
-                RAG_sentence_transformer_model=RAG_sentence_transformer_model, 
-                image_size=image_size
-            )
+              results_empty = False
+
+            except Exception as e:
+                
+              del anomaly_detector
+              print("Re-initializing anomaly_detector...")
+              
+              anomaly_detector = True_sight_interfacer(
+                  reasoning_module=module, 
+                  RAG_sentence_transformer_model=RAG_sentence_transformer_model, 
+                  image_size=image_size
+              )
 
 
 
-        results["video_path"] = full_subfolder_path
+          results["video_path"] = full_subfolder_path
 
 
-        print(f"\n{'='*60}\n COMMITTING VERDICT\n{'='*60}")
-        print(f" video datapath: {results["video_path"]}")
-        print(f" anomaly detected:   {results["is_anomaly"]}")
-        print(f" Category:  {results["anomaly_category"]}")
-        print(f" Reasoning: {results["description"]}")
+          print(f"\n{'='*60}\n COMMITTING VERDICT\n{'='*60}")
+          print(f" video datapath: {results["video_path"]}")
+          print(f" anomaly detected:   {results["is_anomaly"]}")
+          print(f" Category:  {results["anomaly_category"]}")
+          print(f" Reasoning: {results["description"]}")
 
 
-        results_list.append(results)
+          results_list.append(results)
 
 
-    # 2. Create the JSON filename based on the folder name (last part of the path)
-    json_filename = f"{os.path.basename(path)}.json"
+      # 2. Create the JSON filename based on the folder name (last part of the path)
+      json_filename = f"{os.path.basename(path)}.json"
 
-    # 3. Save the results to the JSON file
-    with open(json_dataset_path + "/" + json_filename, 'w') as json_file:
-      json.dump(results_list, json_file, indent=4)
+      os.makedirs(module_name, exist_ok=True)
+      # 3. Save the results to the JSON file
+      with open(module_name + "/" + json_filename, 'w') as json_file:
+        json.dump(results_list, json_file, indent=4)
 
-    print(f"Saved results to {json_filename}")
+      print(f"Saved results to {json_filename}")
 
 
 
@@ -522,8 +525,10 @@ def test_video():
 
   image_size = (224, 224)
   RAG_sentence_transformer_model = "CLIP-ViT-B-32"
+
   # reasoning_module = single_agent_anomaly_detection_module()
-  reasoning_module = self_reflective_single_agent()
+  # reasoning_module = self_reflective_single_agent()
+  reasoning_module = voting_based_multi_agent()
 
   anomaly_detector = True_sight_interfacer(reasoning_module=reasoning_module, RAG_sentence_transformer_model=RAG_sentence_transformer_model, image_size=image_size)
 
