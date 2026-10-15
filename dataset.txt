@@ -1,6 +1,3 @@
-data/DCM4_anomalies/amps_200
-data/DCM4_anomalies/amps_560
-data/DCM4_anomalies/normal_data
 data/DCM4_anomalies/post_trap_rejection
 data/DCM4_anomalies/pre_trap_rejection
 data/DCM4_anomalies/stuck_on_track

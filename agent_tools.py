@@ -15,6 +15,7 @@ This class lists all tools that the True sight Reasoning module can use to solve
 """
 
 
+
 @log_decorator(logging.INFO)
 def check_arguments_valid(arguments_dict: dict, response: ChatResponse):
 
@@ -29,6 +30,8 @@ def check_arguments_valid(arguments_dict: dict, response: ChatResponse):
 
     else:
       return False
+    
+  return False
 
 @log_decorator(logging.INFO)
 def generate_dynamic_tool(variable_dict: dict) -> list:
@@ -82,10 +85,10 @@ def generate_dynamic_tool(variable_dict: dict) -> list:
         }
     }]
 
-@log_decorator(logging.INFO)
-def variable_constrained_prompt(message, variable_dict: dict, model_name: str):
 
-  current_messages = list(message)
+@log_decorator(logging.INFO)
+def variable_constrained_prompt(message: list, variable_dict: dict, model_name: str):
+
 
 
   # 2. Create a strict instruction for the model
@@ -96,22 +99,23 @@ def variable_constrained_prompt(message, variable_dict: dict, model_name: str):
       f"You MUST call the tool 'TOOL_dynamic_variable_constrained_output'. "
       f"You are REQUIRED to pass the following exact arguments:\n{constraints_str_keys}"
   )
-  current_messages.append({"role": "user", "content": instruction})
+  message.append({"role": "user", "content": instruction})
 
   response_rejected = True
   max_tries = 3
   iters = 0
   error_cause = []
 
-  while response_rejected:
-    variable_constrain_tool = generate_dynamic_tool(variable_dict)
+  variable_constrain_tool = generate_dynamic_tool(variable_dict)
 
+
+  while response_rejected:
 
     response = chat(
       model=model_name,
-      messages=current_messages,
+      messages=message,
       tools=variable_constrain_tool,
-      options={"num_ctx": 32768},
+      options={"num_ctx": 65536},
     )
 
     is_truncated = getattr(response, 'finish_reason', None) == "length" 
@@ -125,7 +129,7 @@ def variable_constrained_prompt(message, variable_dict: dict, model_name: str):
             f"ERROR: The tool call was rejected because it did not contain the required variables. "
             f"You MUST pass the following arguments to the tool 'TOOL_determine_image_anomality': {variable_dict}"
         )
-        current_messages.append({"role": "user", "content": error_msg})
+        message.append({"role": "user", "content": error_msg})
         error_cause.append("invalid function structure")
 
       if is_truncated:
@@ -133,7 +137,7 @@ def variable_constrained_prompt(message, variable_dict: dict, model_name: str):
                     "ERROR: Your previous response was cut off because it was too long. "
                     "Please be more concise both in prompt and in the thinking phase"
         )
-        current_messages.append({"role": "user", "content": error_msg})
+        message.append({"role": "user", "content": error_msg})
         error_cause.append("Token count limit reached")
 
       iters += 1

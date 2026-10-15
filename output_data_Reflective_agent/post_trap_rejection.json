@@ -1,0 +1,122 @@
+[
+    {
+        "is_anomaly": false,
+        "anomaly_category": "None",
+        "description": "The video sequence shows a linear vibration feeding process where a roundplate part successfully moves from left to right. It approaches and climbs the central ramp without obstruction, falls off onto the right side of the feeder as expected, and continues moving forward along the track. No signs of post-track or pre-trap rejection (pushed off vertically or sideways) are observed on the main part.",
+        "video_path": "data/DCM4_anomalies/post_trap_rejection/Video_index_1_viewport_0"
+    },
+    {
+        "is_anomaly": true,
+        "anomaly_category": "post-track rejection",
+        "description": "The roundplate part successfully climbs the ramp unhindered, but upon reaching the top, it falls completely off the linear feeder rather than rolling onto the right side of the track. In subsequent frames (e.g., image 7), the part appears as a tiny dot suspended in mid-air below and away from the main feeder structure, indicating it was pushed vertically downwards instead of continuing its forward movement on the feeder. This matches the definition of post-track rejection where the object falls off the track entirely after passing the ramp.",
+        "video_path": "data/DCM4_anomalies/post_trap_rejection/Video_index_11_viewport_0"
+    },
+    {
+        "is_anomaly": true,
+        "anomaly_category": "Post-track rejection",
+        "description": "The roundplate part successfully traverses the ramp and reaches the right side of the linear feeder, but subsequently tips over and falls off the track entirely. As observed in the later frames (images 9 and 10), the object separates from the main feeder structure and lies on the ground/floor, which corresponds to post-track rejection where the part is pushed or falls off the feeder after passing the ramp.",
+        "video_path": "data/DCM4_anomalies/post_trap_rejection/Video_index_19_viewport_0"
+    },
+    {
+        "is_anomaly": true,
+        "anomaly_category": "pre-trap rejection",
+        "description": "The lego roundplate part exhibits significant deformation and loss of structural integrity upon contact with the ramp (visible in Image 3), deviating from the expected 'unhindered climb'. It appears to be sheared or pushed sideways against the ramp surface rather than maintaining its normal cylindrical form as it should move forward into the feeder section. This visual anomaly at the ramp interface indicates a pre-trap rejection event, where the part was not pushed off cleanly but failed to pass through the trap without damage or deviation.",
+        "video_path": "data/DCM4_anomalies/post_trap_rejection/Video_index_15_viewport_0"
+    },
+    {
+        "is_anomaly": true,
+        "anomaly_category": "post-trap rejection",
+        "description": "The roundplate part is seen sliding sideways on top of the ramp rather than climbing it, and subsequently appears below the track boundary (dot in frame 9), indicating a lateral push leading to post-track rejection.",
+        "video_path": "data/DCM4_anomalies/post_trap_rejection/Video_index_3_viewport_0"
+    },
+    {
+        "is_anomaly": false,
+        "anomaly_category": "none",
+        "description": "The video sequence depicts a part (lego roundplate) moving linearly along a feeder track, approaching and successfully crossing the ramp trap. The behavior is consistent with the normal process described: moving towards the ramp, climbing it unhindered, falling off the ledge to the right side, and continuing forward. No anomalies such as pre-trap or post-track rejection (ejection from the track) were observed in the provided frames.",
+        "video_path": "data/DCM4_anomalies/post_trap_rejection/Video_index_5_viewport_0"
+    },
+    {
+        "is_anomaly": false,
+        "anomaly_category": "None",
+        "description": "The roundplate part remains on the linear track throughout the observed sequence. It does not exhibit behavior consistent with anomalies, such as being pushed off the side vertically or falling off the track. The object stays on the planar surface of the feeder, which is considered normal behavior in this simulation until it reaches and falls from the ramp section.",
+        "video_path": "data/DCM4_anomalies/post_trap_rejection/Video_index_8_viewport_0"
+    },
+    {
+        "is_anomaly": false,
+        "anomaly_category": "None",
+        "description": "The input sequence of images shows the linear feeder track structure. There are no clear visual indicators of a roundplate part moving, nor any signs of anomalous behavior such as parts being pushed off the track (pre-trap or post-trap rejection) or falling vertically. Although the specific movement of the roundplate and interaction with the trap ramp may be subtle or not fully captured in these static-like crops, the lack of observed rejection events or ejections means no anomalies can be confirmed based on the visual data provided.",
+        "video_path": "data/DCM4_anomalies/post_trap_rejection/Video_index_12_viewport_0"
+    },
+    {
+        "is_anomaly": true,
+        "anomaly_category": "post_track_rejection",
+        "description": "The sequence shows the part approaching and climbing the ramp normally. However, in later frames (specifically Image 7), a separate roundplate object is observed floating below the linear feeder track structure, non-overlapping with it. This visual evidence indicates the part was pushed off or fell off the track after engaging the ramp, consistent with post-track rejection where the part leaves the boundary of the linear feeder.",
+        "video_path": "data/DCM4_anomalies/post_trap_rejection/Video_index_18_viewport_0"
+    },
+    {
+        "is_anomaly": false,
+        "anomaly_category": "None",
+        "description": "The video sequence shows a roundplate part moving along a linear vibration feeder. After analyzing the input images against the RAG retrieved normal data and sub_sampled_normal_video_process, no anomalous behaviors were detected. The part appears to be on the normal trajectory towards the ramp, following the expected process of climbing the ramp unhindered and moving forward on the linear feeder. No evidence of pre-trap rejection, post-track rejection, or trap rejection was observed. The roundplate part remains within track boundaries throughout the sequence shown.",
+        "video_path": "data/DCM4_anomalies/post_trap_rejection/Video_index_0_viewport_0"
+    },
+    {
+        "is_anomaly": true,
+        "anomaly_category": "post-track rejection",
+        "description": "Analysis of the provided video sequence reveals that while the initial frames show a roundplate on the track, later frames (specifically image 5) exhibit an object with a distinct rectangular or flat-oriented profile, inconsistent with the normal circular rolling motion on a linear feeder. This orientation indicates the part has been pushed sideways or is falling off in a manner not described by the 'move forwards' normal behavior. Given its appearance near the ramp section (the trap), it suggests rejection from the track boundary, fitting the criteria for post-track rejection where the object is oriented vertically to movement direction and pushed off.",
+        "video_path": "data/DCM4_anomalies/post_trap_rejection/Video_index_17_viewport_0"
+    },
+    {
+        "is_anomaly": false,
+        "anomaly_category": "None",
+        "description": "The provided image sequence shows a linear vibration feeding process where the roundplate part moves from left to right along the feeder. In the final frames, the part approaches and is positioned near the ramp structure (part trap). Visual inspection indicates that the part remains aligned with the track surface and has not been pushed off vertically or ejected in an anomalous manner (e.g., pre-trap or post-track rejection) consistent with the normal process described. It follows the expected trajectory of moving towards and climbing/interacting with the ramp.",
+        "video_path": "data/DCM4_anomalies/post_trap_rejection/Video_index_10_viewport_0"
+    },
+    {
+        "is_anomaly": true,
+        "anomaly_category": "post_track_rejection",
+        "description": "The video sequence shows the object moving along the linear feeder towards and over the ramp. In images 9 and 10, after passing the ramp structure, the object tips downwards and falls completely off the boundaries of the linear feeder, unlike the normal process which requires it to land on the continuous feeder track.",
+        "video_path": "data/DCM4_anomalies/post_trap_rejection/Video_index_4_viewport_0"
+    },
+    {
+        "is_anomaly": false,
+        "anomaly_category": "normal",
+        "description": "The video sequence shows the object on the linear track and ramp structure appearing stationary across the frames. This visual staticness is consistent with the described normal process behavior where vibration causes objects to seem still in space. No instances of the part being pushed off the track, falling off in an anomalous way, or exhibiting a dangerous orientation indicative of imminent fall are observed. The part remains on the track as required.",
+        "video_path": "data/DCM4_anomalies/post_trap_rejection/Video_index_9_viewport_0"
+    },
+    {
+        "is_anomaly": true,
+        "anomaly_category": "post-trap rejection",
+        "description": "The roundplate part is pushed off the linear feeder after passing the ramp structure (post-trap), appearing to fall vertically relative to the moving large block assembly. The separation occurs towards the end of the video sequence, indicating a failure post-trap crossing.",
+        "video_path": "data/DCM4_anomalies/post_trap_rejection/Video_index_16_viewport_0"
+    },
+    {
+        "is_anomaly": true,
+        "anomaly_category": "post_trap_rejection",
+        "description": "The roundplate part tumbles and rotates significantly off the track after passing the ramp. The final frames show the part in a non-parallel orientation relative to the feeder's original direction, indicating it has fallen or been pushed off its intended path at the trap, which is inconsistent with normal behavior where it settles parallel to the track.",
+        "video_path": "data/DCM4_anomalies/post_trap_rejection/Video_index_7_viewport_0"
+    },
+    {
+        "is_anomaly": true,
+        "anomaly_category": "trap_rejection",
+        "description": "The video sequence shows a static view of the linear track for frames 1 through 9, with no visible moving part, indicating a lack of expected motion. In frame 10, a small object is visible resting on the ramp section but appears to be stuck or stationary, rather than having successfully climbed the ramp and fallen off to the right as per the normal process. This indicates an anomaly where the part failed to complete its trajectory due to rejection at the trap (ramp).",
+        "video_path": "data/DCM4_anomalies/post_trap_rejection/Video_index_13_viewport_0"
+    },
+    {
+        "is_anomaly": true,
+        "anomaly_category": "post_track_rejection",
+        "description": "The video sequence begins with frames showing a roundplate part moving normally on the linear track (images 1-9). However, the final frame (image 10) shows the object positioned clearly separated and floating below the main track structure. This visual separation indicates that the part was pushed or ejected vertically off the track, which constitutes post-track rejection.",
+        "video_path": "data/DCM4_anomalies/post_trap_rejection/Video_index_14_viewport_0"
+    },
+    {
+        "is_anomaly": false,
+        "anomaly_category": "Normal Process",
+        "description": "The input video sequence shows a roundplate interacting with the linear feeder and ramp structure. Visual evidence from the provided frames does not indicate any vertical ejection, tumbling, or rejection of the part. The object appears to maintain its orientation and position consistent with normal forward motion along the feeder track, aligning with the 'Normal Process Behavior' described in the reference data. There is no indication of the roundplate falling off the linear feeder vertically from either the pre-trap or post-track rejection scenarios.",
+        "video_path": "data/DCM4_anomalies/post_trap_rejection/Video_index_6_viewport_0"
+    },
+    {
+        "is_anomaly": true,
+        "anomaly_category": "trap rejection",
+        "description": "The video sequence shows anomalous behavior compared to the normal process where a part climbs the ramp unhindered and falls. Specifically, an image in the sequence shows a small grey dot falling vertically below the main object, suggesting detachment or breakage. Subsequent frames show the object in a tilted, wedge-like orientation on the ramp, indicating instability and improper orientation while on the track. This deviates from the expected normal behavior of remaining flat until exiting the ramp area.",
+        "video_path": "data/DCM4_anomalies/post_trap_rejection/Video_index_2_viewport_0"
+    }
+]

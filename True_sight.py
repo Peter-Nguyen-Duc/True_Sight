@@ -12,7 +12,7 @@ from agent_tools import True_sight_agent_toolbox
 
 from logging_decorator.decorator_logging import decorate_all_class_methods, log_decorator, generate_logger_file
 import logging
-# generate_logger_file()
+generate_logger_file()
 
 import cv2
 import numpy as np
@@ -275,14 +275,14 @@ class True_sight_interfacer:
 
 
     input_images_count = subsambled_input_images
-    normal_data_process_images_count = 10
+    normal_data_process_images_count = 5
     RAG_k_nn = 1
 
     normal_video_demonstration = "data/DCM4_anomalies/normal_data/Video_index_0_viewport_0"
     prompt = f"Use the given function call, to give me an anomaly report on the video sequence represented by the {input_images_count} first images on image input."
 
 
-    task_prompt = "TASK: Analyze the provided image for anomalies. Compare the target images against the provided 'Normal' reference images."
+    task_prompt = "TASK: Analyze the provided image for anomalies. Compare the target images against the provided 'Normal' reference images. Think in frame by frame analysis of what is going on"
         
     normal_data_prompt = """
                               ***Normal process behavior***:
@@ -310,7 +310,8 @@ class True_sight_interfacer:
                             - The part has been pushed of the linear feeder vertical to the part movement direction, prior to falling of the ramp (pre-trap rejection)
                               -  As with post trap rejection but in this case, the part must have visual indication that the part was pushed off, before entering the trap ramp.
                             - trap rejection means that the object has been or is amidst of being pushed off the track entirely, while movement parallel to the track direction is expected.
-                            - It is an anomaly if there are any indications that the part is orientented in such a way, that it seems to be falling off the track. 
+                            - It is also an anomaly if there are any indications that the part was previously pushed off the track, such that the object at current analysed image is in freefall.
+
 
                             There are more anomalous behaviors than these examples, so watch out for all behavior that does not adhere to the normal process.
 
@@ -393,7 +394,8 @@ class True_sight_interfacer:
 
     target_input_images.append(video_images[len(video_images) - 1 ])
 
-    #plot_images(target_input_images, "new normal data")
+    # plot_images(target_input_images, title_name="input data")
+    # plot_images(target_input_images, "new normal data")
 
     # Get RAG image retrieval
     RAG_images_list = []
@@ -406,7 +408,7 @@ class True_sight_interfacer:
     target_input_images, RAG_images_list, normal_video_process_subsambled
 
     combined_images["input images"] = target_input_images
-    combined_images["RAG"] = RAG_images_list
+    combined_images["RAG images"] = RAG_images_list
     combined_images["sub_sampled_normal_video_process"] = normal_video_process_subsambled
 
     # plot_images(combined_images["input images"], "input_images")
@@ -431,17 +433,19 @@ class True_sight_interfacer:
 
 
 @log_decorator(logging.INFO)
-def main():
+def test_dataset():
 
-  json_dataset_path = "output_data"
+  json_dataset_path = "output_data_single_agent"
   image_size = (224, 224)
   RAG_sentence_transformer_model = "CLIP-ViT-B-32"
   # reasoning_module = single_agent_anomaly_detection_module()
-  reasoning_module = self_reflective_single_agent()
+  reasoning_module = single_agent_anomaly_detection_module()
 
   anomaly_detector = True_sight_interfacer(reasoning_module=reasoning_module, RAG_sentence_transformer_model=RAG_sentence_transformer_model, image_size=image_size)
 
-  get_list_of_datasets = "test_dataset.txt"
+  get_list_of_datasets = "dataset.txt"
+
+
 
   with open(get_list_of_datasets, 'r') as f:
     paths = sorted([x.strip() for x in f.readlines()])
@@ -458,15 +462,21 @@ def main():
 
       if os.path.isdir(full_subfolder_path):
 
-        try:
-          results = anomaly_detector.video_AD(
-              video_input_path=full_subfolder_path, 
-              subsambled_input_images=10, 
-              image_size=image_size
-              )
+        results_empty = True
+        while results_empty:
 
-        except Exception as e:
+          try:
+
+            results = anomaly_detector.video_AD(
+                video_input_path=full_subfolder_path, 
+                subsambled_input_images=10, 
+                image_size=image_size
+                )
             
+            results_empty = False
+
+          except Exception as e:
+              
             del anomaly_detector
             print("Re-initializing anomaly_detector...")
             
@@ -507,8 +517,68 @@ def main():
 
 
 
+def test_video():
+  path = "data/DCM4_anomalies/post_trap_rejection/Video_index_12_viewport_0"
+
+  image_size = (224, 224)
+  RAG_sentence_transformer_model = "CLIP-ViT-B-32"
+  # reasoning_module = single_agent_anomaly_detection_module()
+  reasoning_module = self_reflective_single_agent()
+
+  anomaly_detector = True_sight_interfacer(reasoning_module=reasoning_module, RAG_sentence_transformer_model=RAG_sentence_transformer_model, image_size=image_size)
+
+  results = anomaly_detector.video_AD(
+      video_input_path=path, 
+      subsambled_input_images=10, 
+      image_size=image_size,
+      normal_data_path="RAG_data/normal_data_224.pkl"
+      )
+  results["video_path"] = path
+  print(f"\n{'='*60}\n COMMITTING VERDICT\n{'='*60}")
+  print(f" video datapath: {results["video_path"]}")
+  print(f" anomaly detected:   {results["is_anomaly"]}")
+  print(f" Category:  {results["anomaly_category"]}")
+  print(f" Reasoning: {results["description"]}")
+
+def generate_RAG_database():
+
+
+  image_size = (224, 224)
+  RAG_sentence_transformer_model = "CLIP-ViT-B-32"
+  # reasoning_module = single_agent_anomaly_detection_module()
+  reasoning_module = self_reflective_single_agent()
+
+  anomaly_detector = True_sight_interfacer(reasoning_module=reasoning_module, RAG_sentence_transformer_model=RAG_sentence_transformer_model, image_size=image_size)
+
+  normal_data_path_list = ["data/DCM4_anomalies/normal_data/Video_index_0_viewport_0",
+                      "data/DCM4_anomalies/normal_data/Video_index_1_viewport_0",
+                      "data/DCM4_anomalies/normal_data/Video_index_2_viewport_0",
+                      "data/DCM4_anomalies/normal_data/Video_index_3_viewport_0",
+                      "data/DCM4_anomalies/normal_data/Video_index_4_viewport_0",
+                      "data/DCM4_anomalies/normal_data/Video_index_5_viewport_0",
+                      "data/DCM4_anomalies/normal_data/Video_index_6_viewport_0",
+                      "data/DCM4_anomalies/normal_data/Video_index_7_viewport_0",
+                      "data/DCM4_anomalies/normal_data/Video_index_8_viewport_0",
+                      "data/DCM4_anomalies/normal_data/Video_index_9_viewport_0",
+                      "data/DCM4_anomalies/normal_data/Video_index_10_viewport_0",
+                      "data/DCM4_anomalies/normal_data/Video_index_11_viewport_0",
+                      "data/DCM4_anomalies/normal_data/Video_index_12_viewport_0",
+                      "data/DCM4_anomalies/normal_data/Video_index_13_viewport_0",
+                      "data/DCM4_anomalies/normal_data/Video_index_14_viewport_0",
+                      "data/DCM4_anomalies/normal_data/Video_index_15_viewport_0",
+                      "data/DCM4_anomalies/normal_data/Video_index_16_viewport_0",
+                      "data/DCM4_anomalies/normal_data/Video_index_17_viewport_0",
+                      "data/DCM4_anomalies/normal_data/Video_index_18_viewport_0",
+                      "data/DCM4_anomalies/normal_data/Video_index_19_viewport_0",]
+  
+  results = anomaly_detector.generate_normal_database(normal_data_path_list=normal_data_path_list, image_size=image_size, save_path="RAG_data/normal_data_512.pkl")
+
+
 
 if __name__ == '__main__':
-  main()
+
+  # generate_RAG_database()
+  test_video()
+  # test_dataset()
 
 

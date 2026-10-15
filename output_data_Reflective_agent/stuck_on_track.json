@@ -1,0 +1,122 @@
+[
+    {
+        "is_anomaly": false,
+        "anomaly_category": "None",
+        "description": "The object in the video sequence is a lego roundplate moving on a linear feeder. The images show the part positioned after it has passed over the ramp/trap section, moving along the horizontal feeder. There are no visual indications of the part being pushed vertically off the track, falling off the side (post or pre-trap rejection), or having an orientation that suggests it is falling off the track. The object appears stable and correctly oriented relative to the feeder direction throughout the provided frames.",
+        "video_path": "data/DCM4_anomalies/stuck_on_track/Video_index_1_viewport_0"
+    },
+    {
+        "is_anomaly": false,
+        "anomaly_category": "None",
+        "description": "The provided input sequence appears to show a static or low-activity view of the linear feeder mechanism. No distinct roundplate object is clearly visible moving along the track in the first set of 10 frames, nor are there any obvious deviations in track geometry or part orientation (e.g., stuck on ramp) that would constitute the specific anomalies listed (like post-trap rejection). The visual content in the input sequence resembles the reference normal data (grey tracks/ramps), and no clear evidence of anomalous behavior is detected within this video segment.",
+        "video_path": "data/DCM4_anomalies/stuck_on_track/Video_index_11_viewport_0"
+    },
+    {
+        "is_anomaly": true,
+        "anomaly_category": "trap rejection or post-trap rejection due to lateral push-off",
+        "description": "The video sequence shows the part successfully approaching and climbing the ramp. However, in the later frames (specifically images 9 and 10), the roundplate appears to have been ejected or pushed off the linear track's vertical surface rather than falling off the ramp to land on the feeder to the right. In normal behavior seen in the sub-sampled video process, the part would clear the ramp and continue moving forward along the track. Here, the orientation suggests a sideways push-off from the track boundary itself (post-track rejection).",
+        "video_path": "data/DCM4_anomalies/stuck_on_track/Video_index_19_viewport_0"
+    },
+    {
+        "is_anomaly": false,
+        "anomaly_category": "",
+        "description": "The analyzed video sequence exhibits normal process behavior. The object is moving along the linear track and passing through the ramp section without getting stuck or being pushed off vertically, consistent with the expected operation of the linear vibration feeding simulation.",
+        "video_path": "data/DCM4_anomalies/stuck_on_track/Video_index_15_viewport_0"
+    },
+    {
+        "is_anomaly": false,
+        "anomaly_category": "\"None\"",
+        "description": "\"The input images represent a sequence of identical frames showing the object positioned on the linear feeder, prior to interacting with the ramp (trap). According to the normal process description, as long as the roundplate is still on the track and 'move towards ramp' has occurred without rejection, no anomaly exists. The visual evidence shows the part in a valid starting position or pre-trap state, consistent with the reference 'normal' data images where the object is present on the linear feeder before any interaction with the trap ramp.\"",
+        "video_path": "data/DCM4_anomalies/stuck_on_track/Video_index_3_viewport_0"
+    },
+    {
+        "is_anomaly": false,
+        "anomaly_category": "none",
+        "description": "The video sequence shows the part moving towards and across the linear feeder track with a ramp (trap). It approaches the ramp from the left, climbs over it, and continues moving forwards on the right side. There are no visual indications of the part being pushed off the track vertically or sideways, nor any anomalies of falling off the track in an unintended manner consistent with pre-trap or post-track rejection definitions within the first 10 frames. The behavior aligns with the described normal process.",
+        "video_path": "data/DCM4_anomalies/stuck_on_track/Video_index_5_viewport_0"
+    },
+    {
+        "is_anomaly": false,
+        "anomaly_category": "None",
+        "description": "The lego roundplate is located on the linear feeder near the ramp section. It appears to be oriented parallel to the direction of motion and remains within the boundaries of the track (bounded by the visible edge). There are no visual indicators that it has been pushed off the track sideways or that it is oriented as if falling off, consistent with the normal process of climbing the ramp and moving forward.",
+        "video_path": "data/DCM4_anomalies/stuck_on_track/Video_index_8_viewport_0"
+    },
+    {
+        "is_anomaly": false,
+        "anomaly_category": "None",
+        "description": "The roundplate moves from the left side of the linear feeder, approaches and climbs the ramp (part trap) smoothly without obstruction. It falls off the ledge onto the right-side lower feeder and continues to move forwards on the track. The sequence aligns perfectly with the described normal process behavior. There are no indications of post-track or pre-trap rejection, nor any vertical pushing off the track boundaries.",
+        "video_path": "data/DCM4_anomalies/stuck_on_track/Video_index_12_viewport_0"
+    },
+    {
+        "is_anomaly": false,
+        "anomaly_category": "None",
+        "description": "The video sequence shows a part on a vibrating linear feeder approaching a ramp structure. The movement is consistent with normal behavior (\"move towards the ramp\"). There are no indications of pre-trap or post-track rejection, such as the part being pushed off the track laterally or falling off the right side. The object remains contained within the track boundaries throughout the sequence.",
+        "video_path": "data/DCM4_anomalies/stuck_on_track/Video_index_18_viewport_0"
+    },
+    {
+        "is_anomaly": true,
+        "anomaly_category": "post_track_rejection",
+        "description": "The roundplate moves across the track and reaches the ramp structure. Unlike normal behavior where it rolls over the ledge to move forward on the right side, the part tips over and hangs vertically underneath the ramp's overhang in the final frames (images 9 and 10), indicating it was pushed off the track perpendicular to its movement direction.",
+        "video_path": "data/DCM4_anomalies/stuck_on_track/Video_index_0_viewport_0"
+    },
+    {
+        "is_anomaly": false,
+        "anomaly_category": "None",
+        "description": "The analysis of the provided image sequence indicates normal process behavior. Based on visual inspection, all frames show an identical static 3D rendering of a Lego roundplate positioned on a linear feeder track with an integrated ramp (trap). Since the input consists of identical non-dynamic images rather than temporal video data, motion analysis was limited to position relative to track features. The roundplate is oriented upright and parallel to the feed direction, sitting stably within the linear track boundaries. No visual indicators suggest pre-trap rejection (pushed off before entering ramp) or post-trap rejection (pushed off vertically after passing ramp). Position appears consistent with normal progression where a part should move unhindered along the feeder without disorientation or track boundary violation. The configuration matches expected normal behavior patterns described in the reference materials.\"",
+        "video_path": "data/DCM4_anomalies/stuck_on_track/Video_index_17_viewport_0"
+    },
+    {
+        "is_anomaly": true,
+        "anomaly_category": "post-track rejection",
+        "description": "The input video sequence (represented by the 10 images) appears to be static or consists of identical frames showing only a grey linear track component with a ramp, lacking the expected moving lego roundplate part that characterizes the normal feeding process. The normal process involves the roundplate moving towards and over the ramp and falling onto the right side. The absence of movement or the part in the input sequence indicates an anomaly, consistent with a scenario where the part has been pushed off the track (post-track rejection), leaving only the feeder component visible.",
+        "video_path": "data/DCM4_anomalies/stuck_on_track/Video_index_10_viewport_0"
+    },
+    {
+        "description": "The video sequence shows a part climbing the ramp normally in the first half (frames 1-6). However, in the later frames (frames 7-8), the part appears to be oriented vertically or has been pushed sideways, deviating from the expected flat movement and falling off pattern. This indicates an anomaly where the part was likely pushed off-center on the ramp, resulting in a vertical orientation as it falls (trap rejection or similar fall-related anomaly).",
+        "is_anomaly": true,
+        "anomaly_category": "trap rejection",
+        "video_path": "data/DCM4_anomalies/stuck_on_track/Video_index_4_viewport_0"
+    },
+    {
+        "is_anomaly": true,
+        "anomaly_category": "pre-trap rejection",
+        "description": "The object fails to climb the ramp, tumbling off sideways instead of moving forward. This deviation from the linear feeder's intended path at the trap location indicates pre-trap rejection.",
+        "video_path": "data/DCM4_anomalies/stuck_on_track/Video_index_9_viewport_0"
+    },
+    {
+        "is_anomaly": false,
+        "anomaly_category": "None",
+        "description": "The roundplate moves along the linear feeder and successfully navigates the ramp without obstruction, falling naturally to the right side as per the normal process description. No anomalous behaviors such as pre-trap or post-track rejection were observed.",
+        "video_path": "data/DCM4_anomalies/stuck_on_track/Video_index_16_viewport_0"
+    },
+    {
+        "is_anomaly": true,
+        "anomaly_category": "trap rejection",
+        "description": "The input video sequence shows a linear feeder track with visible ramp structures, but unlike the normal reference process (subsamped_normal_video_process) where a lego roundplate moves unhindered over the trap, no distinct part is clearly visible moving along the track or climbing the ramp in the input images. The absence of the expected object or its anomalous state implies it has been rejected from the feed. Based on the lack of interaction with the trap and presence of track elements, this suggests a trap rejection event where the part was likely pushed off the track (post-trap rejection).",
+        "video_path": "data/DCM4_anomalies/stuck_on_track/Video_index_7_viewport_0"
+    },
+    {
+        "is_anomaly": true,
+        "anomaly_category": "trap rejection",
+        "description": "The part climbs onto the ramp structure but remains perched on top for multiple frames without falling off onto the right side feeder or moving forwards, indicating it has been stuck at the trap location rather than successfully traversing it.",
+        "video_path": "data/DCM4_anomalies/stuck_on_track/Video_index_13_viewport_0"
+    },
+    {
+        "is_anomaly": false,
+        "anomaly_category": "N/A",
+        "description": "The video sequence provided in the \"input images\" shows a linear vibration feeding simulation where the object (Lego roundplate) moves from the left side of the track, climbs across the ramp trap structure, and continues moving forward to the right. This process visually matches the behavior shown in the \"NORMAL DATA DESCRIPTION\" retrieved normal data instances (RAG) and the \"sub_sampled_normal_video_process\". Specifically, the sequence depicts the expected progression: approach (left of ramp), interaction/climb (on top of the ramp structure), and movement past the gap onto the right side of the feeder. There is no visual indication of the part being pushed off the track boundary, stuck, or rejected before passing the trap. The stationary frames (im 1 & 2) are consistent with the described vibration effect where the object appears still.",
+        "video_path": "data/DCM4_anomalies/stuck_on_track/Video_index_14_viewport_0"
+    },
+    {
+        "is_anomaly": false,
+        "anomaly_category": "\"no anomalous behavior\"",
+        "description": "The part on the linear feeder moves forward consistently across the track. It is seen approaching the ramp and remains aligned with the movement direction, not showing any vertical displacement or falling off the track as defined in the anomaly criteria (post-track or pre-trap rejection). The behavior matches the expected normal process of moving unhindered towards the ramp.",
+        "video_path": "data/DCM4_anomalies/stuck_on_track/Video_index_6_viewport_0"
+    },
+    {
+        "is_anomaly": false,
+        "anomaly_category": "None",
+        "description": "The input video sequence shows a lego roundplate on a linear feeder. The part approaches the trap/ramp structure, climbs it unhindered, and then continues moving forward on the right side of the feeder. Throughout the entire sequence (10 frames), the part remains clearly positioned within the track boundaries. There are no visual signs of pre-trap rejection (pushed off before the ramp) or post-trap rejection (pushed off after exiting). The movement is consistent with normal behavior described in the reference data.\"",
+        "video_path": "data/DCM4_anomalies/stuck_on_track/Video_index_2_viewport_0"
+    }
+]

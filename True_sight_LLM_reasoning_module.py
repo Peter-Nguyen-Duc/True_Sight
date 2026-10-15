@@ -25,6 +25,11 @@ import logging
 # generate_logger_file()
 
 from agent_tools import check_arguments_valid, variable_constrained_prompt
+import matplotlib.pyplot as plt
+
+from transformers import AutoTokenizer
+
+
 
 
 @decorate_all_class_methods
@@ -51,11 +56,37 @@ class true_sight_reasoning_framework:
 
     self._main_agent_role = None
 
+
+    # 1. Create a mapping from Ollama tags to Hugging Face paths
+    model_mapping = {
+        "qwen3.5:4b": "Qwen/Qwen3.5-4B", # Closest HF equivalent for tokenizer
+    }
+    self._tokenizer = AutoTokenizer.from_pretrained(model_mapping[self._model_name])
+
+
     # This is a copy of the agent tools, so that if additional tools are added or deleted, the standard agent are not cleared.
     # You must manually copy the self._tools_for_agents varible into this variable when granting additional tools from a child class.
     self._standard_agent_tools = {}
     
+
+
+  def check_context_limit(self, messages, limit=300000):
+    total_tokens = 0
+    for msg in messages:
+        # Tokenize the content of each message
+        tokens = self._tokenizer.encode(msg['content'], add_special_tokens=False)
+        total_tokens += len(tokens)
     
+    if total_tokens > limit:
+        print(f"WARNING: Context limit exceeded!")
+        print(f"Total tokens: {total_tokens} | Limit: {limit}")
+        print(f"The model will truncate approximately {total_tokens - limit} tokens from the start.")
+        return False
+
+    
+    return True
+
+
   def add_agent(self, role_name, role_description, tool_func_list, goal_for_role, main_agent = False):
     """Add a new agent role to the framework."""
 
@@ -78,29 +109,10 @@ class true_sight_reasoning_framework:
 
 
 
-
-  def preprocess_input(self, query, image_input):
+  def add_images_to_message(self, messages: list, image_input):
 
 
     image_data = []
-    messages = []
-
-    prompt = f"""
-            ### role:
-              {self._roles[self._main_agent_role]}
-
-            ### goal:
-              {self._goals_for_roles[self._main_agent_role]}
-
-            ### call content:
-              {query}
-            """
-
-    # We use a list for 'content' to allow interleaving text and images
-    content_blocks = []
-    
-    # Add the initial text prompt
-    content_blocks.append({"type": "text", "text": prompt})
 
 
     if isinstance(image_input, dict):
@@ -110,12 +122,11 @@ class true_sight_reasoning_framework:
 
         image_data_group = {"role": "user",}
         image_data =  []
-
-        for im in images:
-          image_data.append(self._get_image_data_from_input(im))
-
         # Add a text label block before the images of this group
         label = f"\n--- {group_name.upper()} ---\n"
+        # print(label)
+        for im in images:
+          image_data.append(self._get_image_data_from_input(im))
 
         image_data_group["content"] = label
         image_data_group["images"] = image_data
@@ -123,8 +134,7 @@ class true_sight_reasoning_framework:
     
     # Fallback: If image_groups is still a list, we treat it as one big group
     elif isinstance(image_input, list):
-        content_blocks.append({"type": "text", "text": "\n--- IMAGES ---\n"})
-
+        
         image_data =  []
 
         for im in image_input:
@@ -134,7 +144,6 @@ class true_sight_reasoning_framework:
 
         # Add a text label block before the images of this group
         label = f"\n--- IMAGES ---\n"
-
         image_data_group["content"] = label
         image_data_group["images"] = image_data
         messages.append(image_data_group)
@@ -152,28 +161,42 @@ class true_sight_reasoning_framework:
         image_data_group["images"] = [img_data]
         messages.append(image_data_group)
 
-
-    # if isinstance(image_input, list):
-    #   for image in image_input:
-    #     image_data.append(self._get_image_data_from_input(image))
-    # else:
-    #   image_data.append(self._get_image_data_from_input(image_input))
-
-
-    prompt_message = {
-              "role": "user",
-              "content": prompt,    # <-- flat, parallel to content
-          }
-    messages.append(prompt_message)
     
     return messages
 
 
-  def run_framework(self, query, image_input = None, allow_tool_calling = False, variable_constrain=None):
+  def add_agent_agenda_to_message(self, message: list, query: str, agent_name: str):
 
-    messages = self.preprocess_input(query=query, image_input=image_input)
+    prompt = f"""
+            ### role:
+              {self._roles[agent_name]}
 
-    response = self.call_main_agent(query=messages, allow_tool_calling=allow_tool_calling, variable_constrain=variable_constrain)
+            ### goal:
+              {self._goals_for_roles[agent_name]}
+
+            ### call content:
+              {query}
+            """
+    
+    prompt_message = {
+              "role": "user",
+              "content": prompt,    # <-- flat, parallel to content
+          }
+    
+    message.append(prompt_message)
+
+    return message
+    
+
+
+  def run_framework(self, query, image_input = None, variable_constrain=None):
+
+    messages = []
+
+    messages = self.add_images_to_message(messages=messages, image_input=image_input)
+
+    messages_main_agent = self.add_agent_agenda_to_message(message=messages, query=query, agent_name=self._main_agent_role)
+    response = self.call_main_agent(query=messages_main_agent, variable_constrain=variable_constrain)
 
     return response
 
@@ -196,7 +219,7 @@ class true_sight_reasoning_framework:
         model=self._model_name,
         messages=query,
         tools=self.get_agent_tools(self._main_agent_role),
-        options={"num_ctx": 32768},
+        options={"num_ctx": 300000},
       )
     else:
       response = variable_constrained_prompt(message=query, variable_dict=variable_constrain, model_name=self._model_name)
@@ -206,7 +229,42 @@ class true_sight_reasoning_framework:
 
 
 
-    
+
+  # Add this method to your class
+  def plot_processed_image(self, image_data):
+      """
+      Visualizes the output of _get_image_data_from_input.
+      Handles both file paths (str) and encoded bytes.
+      """
+      img = None
+
+      if isinstance(image_data, str):
+          # Case 1: It's a path, read it from disk
+          img = cv2.imread(image_data)
+          if img is None:
+              print(f"Error: Could not read image from path {image_data}")
+              return
+
+      elif isinstance(image_data, bytes):
+          # Case 2: It's encoded bytes, decode them back to a numpy array
+          nparr = np.frombuffer(image_data, np.uint8)
+          img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+          if img is None:
+              print("Error: Could not decode image bytes.")
+              return
+
+      else:
+          print("Error: image_data is neither a path string nor bytes.")
+          return
+
+      # OpenCV reads in BGR, Matplotlib expects RGB
+      img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+      plt.figure(figsize=(10, 8))
+      plt.imshow(img_rgb)
+      plt.axis('off') 
+      plt.title("Processed Image Preview")
+      plt.show()
 
   def _get_image_data_from_input(self, image_input):
     image_data = None
@@ -227,47 +285,28 @@ class true_sight_reasoning_framework:
       else:
         raise TypeError("image_input must be either a string (path) or a numpy array.")
 
+
+      # self.plot_processed_image(image_data)
       return image_data
 
-  def run_agent(self, role_name, query):
-    """Run a specific agent role in the framework."""
+  def call_agent(self, role_name, query, variable_constrain=None):
+    """Run the framework with the main agent role."""
 
-    if role_name not in self._roles:
-        raise ValueError(f"Role '{role_name}' is not defined in the framework.")
+    if not self._main_agent_role:
+      raise ValueError("No main agent role defined. Please set main_agent=True for one of the agents.")
 
-    prompt = f"""
-            ### role:
-              {self._roles[role_name]}
-
-            ### goal:
-              {self._goals_for_roles[role_name]}
-
-            ### call content:
-              {query}
-            """
-
-    
-    messages = [{"role": "user", "content": prompt}]
-
-
-    response = chat(
+    if variable_constrain == None:
+      response = chat(
         model=self._model_name,
-        messages=messages,
-        tools=self._tools_for_agents[role_name].values(),
-        options={"num_ctx": 32768},
-    )
-    output = response.message.content
+        messages=query,
+        tools=self.get_agent_tools(role_name),
+        options={"num_ctx": 300000},
+      )
+    else:
+      response = variable_constrained_prompt(message=query, variable_dict=variable_constrain, model_name=self._model_name)
 
+    return response
 
-    if response.message.tool_calls:
-        call = response.message.tool_calls[0]
-        tool_name = call.function.name
-        arguments = dict(call.function.arguments or {})
-        
-
-        # overwrite the output with the tool call result
-        output = self._tools_for_agents[role_name][tool_name](**arguments)
-    return output
 
 
   def grant_main_agent_tool(self, func):
@@ -388,27 +427,21 @@ class self_reflective_single_agent(true_sight_reasoning_framework):
   ###
 
   def __init__(self, model_name="qwen3.5:4b"):
-    """
 
-    This REASONING_STATUS variable is used to ensure that the model has had enough reasoning time before giving i final answer
-    in which the reasoning status variable is flicked into "final answer ready"
-
-    The status types for REASONING_STATUS:
-     - Awaiting prompt
-     - retrieving input
-     - Reasoning over data
-     - final answer ready
-
-    """
-    
     super().__init__(model_name)
 
-    self._REASONING_STATUS = "Awaiting prompt"
 
 
     #chat.dk generated reasoning role for the agent 
     reasoning_agent_description =   """
                         You do video analysis using the tools available and afterwards use reasoning to deduce if an image or a video is anomalous or not
+
+                        You have access to, and should infer all your reasoning from, all the following provided data.
+                        - RAG retrieved data: images will be provided with the label, " --- RAG images --- " these are not labeled but given
+                        - Normal process data: These images are given to the agent also and does not require evidence, These images will be
+                                                labeled as " --- sub_sampled_normal_video_process --- "
+                        - Input image data:  These are the input data variables that must be used to check for anomalies in these will be within
+                                              the message, labeled with " --- input images --- "
                         """
 
     # This is the specific goal passed to the agent framework
@@ -426,6 +459,16 @@ class self_reflective_single_agent(true_sight_reasoning_framework):
                       You operate with a "skeptical" mindset. You do not assume the Main Agent is correct; instead, 
                       you actively look for reasons why the response might be insufficient, misleading, or 
                       incorrectly formatted. You are the final gatekeeper before a response reaches the user.
+
+                      Input data that the main agent will have access to, which does not require evidence from the main agent to refer to.
+                      Therefore do not categorize the usage of this data as a hallucination behavior
+                       - RAG retrieved data: images will be provided with the label, " --- RAG images --- " these are not labeled but given
+                       - Normal process data: These images are given to the agent also and does not require evidence, These images will be
+                                              labeled as " --- sub_sampled_normal_video_process --- "
+                       - Input image data:  These are the input data variables that must be used to check for anomalies in these will be within
+                                            the message, labeled with " --- input images --- "
+
+                      Do not worry about correct toolcalling, as this is handled and guranteed at your level.
                       """
 
 
@@ -433,12 +476,6 @@ class self_reflective_single_agent(true_sight_reasoning_framework):
     reflective_agent_goal =  """
                             Your goal is to evaluate the interaction between the User and the Main Agent.
                             Keep your verdict short and consice, to avoid a noisy output.
-
-                            1. TOOL VALIDATION: 
-                              - Determine if the query required external data or a tool call.
-                              - If a tool was required but NOT called, this is a failure.
-                              - If a tool WAS called, verify that the Main Agent actually used the information returned by the tool in its final answer, rather than ignoring it or hallucinating.
-                              - DEBUGGING ADDITION, when evidence of tool calling is detected, no other output is required to pass the test.
 
                             2. FINAL VERDICT:
                               - If the response passes, you MUST start your response with the exact word: 'APPROVED'.
@@ -476,57 +513,85 @@ class self_reflective_single_agent(true_sight_reasoning_framework):
     RUN THE FRAMEWORK WITH A REFLECTIVE LOOP
     """
     # 1. Initial preprocessing
-    messages = self.preprocess_input(query=query, image_input=image_input)
+    messages = []
+    messages_only_images = self.add_images_to_message(messages=messages, image_input=image_input)
     
     # 2. Initial call to the main agent
-    response = self.call_main_agent(query=messages, variable_constrain=variable_constrain)
+    main_agent_messages = self.add_agent_agenda_to_message(copy.deepcopy(messages_only_images), query=query, agent_name=self._main_agent_role)
+    response = self.call_main_agent(query=main_agent_messages, variable_constrain=variable_constrain)
     
     # Loop for reflection and regeneration
     for i in range(max_reflections):
 
-      is_approved, reasoning = self.get_reflective_agent_input(message=messages, response=response)
+      is_approved, reasoning = self.get_reflective_agent_input(message=main_agent_messages, response=response)
 
       if is_approved:
         break
           
-      feedback_prompt = f"Your previous response was: {response}\n\nCritique: {reasoning}\n\nPlease regenerate the response addressing these points."
-      messages.append({"role": "user", "content": feedback_prompt})
-      
-      response = self.call_main_agent(query=messages, variable_constrain=variable_constrain)
+      feedback_prompt = f"""
+      Your response has been rejected by the reflective agent. Please regenerate the response, while addressing the critique given
+
+        ### Critique:
+              {reasoning}
+      """
+
+      query += feedback_prompt
+
+      # Regenerate the main agent message, but add the critique given be the reflective agent.
+      main_agent_messages = self.add_agent_agenda_to_message(copy.deepcopy(messages_only_images), query=query, agent_name=self._main_agent_role)
+
+      response = self.call_main_agent(query=main_agent_messages, variable_constrain=variable_constrain)
         
     return response
 
 
   def get_reflective_agent_input(self, message, response) -> tuple[bool, str]:
 
-    prompt = f"""
-            fill out the arguments with the verdict and the reason, such that:
-            verdict = True, if the text is APPROVED
-            verdict = False, if the text is NOT APPROVED
 
-            reasoning: Contains the arguments of the verdict
-    
+    # 1. Extract the actual text from the response object to add it to the conversation
+    if hasattr(response, 'message') and hasattr(response.message, 'content'):
+        main_agent_text = response.message.content
+    elif isinstance(response, dict) and 'message' in response:
+        main_agent_text = response['message'].get('content', '')
+    else:
+        main_agent_text = str(response)
 
-            ### User Message:
-              {message}
+    # 2. Construct the "Audit Context"
+    # We start with the original messages (which include the images)
+    audit_history = copy.deepcopy(message)
 
-            ### Main Agent Response:
-              {response}
+    # We append the main agent's response as a message so the reflective agent
+    # sees it as the last thing said by the assistant.
+    audit_history.append({
+        "role": "assistant",
+        "content": main_agent_text
+    })
 
-            ### Instruction:
-            If response satisfies established criteria, set boolean "is_approved" to true.
-            Otherwise, provide specific, actionable feedback on what is missing or wrong and set "is_approved" = False.
+
+    query = f"""
+            Please audit the previous response from the assistant.
+            
+            Fill out the arguments with the verdict and the reason:
+            - is_approved = True, if the response is APPROVED.
+            - is_approved = False, if the response is NOT APPROVED.
+            - reasoning: Provide specific, actionable feedback on what is missing, 
+              incorrect, or hallucinated based on the provided images.
+
+            Criteria for Approval:
+            1. Does the response logically follow from the images provided?
+            2. Does it avoid hallucinating details not present in the images?
+            3. Is the formatting correct?
             """
 
+    messages_with_reflective_agent = self.add_agent_agenda_to_message(message=audit_history, query=query, agent_name="reflective_agent")
     
-    messages = [{"role": "user", 
-            "content": prompt}]
-
 
     variable_dict = {"is_approved": bool,
                      "reasoning": str,
                       }
-    output = variable_constrained_prompt(messages, variable_dict, model_name=self._model_name)
+    
+    self.check_context_limit(messages=messages_with_reflective_agent)
+    output = variable_constrained_prompt(messages_with_reflective_agent, variable_dict, model_name=self._model_name)
 
     is_approved = output["is_approved"]
     reasoning = output["reasoning"]
@@ -534,34 +599,177 @@ class self_reflective_single_agent(true_sight_reasoning_framework):
     return is_approved, reasoning
 
 
+
+
   
+class voting_based_multi_agent(true_sight_reasoning_framework):
+  ###
+  # This agentic system is used for labeling video as anomalies and highlighting critical parts on a video.
+  # The main focus of this method is to split thoughts into a multi agent, independent thinking process.
+
+  # The three main voting agents will be prompted to think in three different directions
+  # - Will focus on behavior that resembles trap rejection, a detailed role prompt will also be granted which aids the agent into this thinking direction
+  # - Will focus on the movement behavior, and track if there are any irregularities, regarding the direction the part moves, in comparison to the normal data.
+  # - Will focus on the normal prompt that was given, and specifically cross list anomaly subjects on the list to check if any anomalies that resembles the
+  #   described anomalous behavior has been identified. This agent will also be granted a reflective agent.
+
+  # The task delegator will count up the votes of all agents, read their reasoning and choose the highest vote count, where the anomaly description will be 
+  # Inferred based on their reasoning
+
+  ###
+
+  def __init__(self, model_name="qwen3.5:4b"):
+    super().__init__(model_name)
+
+    # Role: The specialist focusing on trap rejection behavior
+    trap_rejection_agent_role = """
+    You are a Specialized Quality Assurance Agent focusing exclusively on 'Trap Rejection' behaviors. 
+    Your expertise is in identifying when a part fails to seat correctly in a trap, is pushed back out, 
+    or exhibits the specific mechanical signature of a rejection event. 
+
+    Key focus areas Video end deduction, Given that last 2-3 images how can it be 
+    concluded that that the video ended? Furthermore, you must also identify
+    movement irregularities given that the part might be rejected. Vertical movement to the normal
+    movement direction is a clear sign of the start of part rejection
+    """
+
+    # Goal: The specific task for the trap rejection agent
+    trap_rejection_agent_goal = """
+    Analyze the video to determine if a 'Trap Rejection' event occurred. 
+    1. Identify the exact moment the part exhibits anomalous behavior according to trap rejection
+    2. Determine if the part was successfully accepted or if it was rejected.
+    3. Provide a boolean vote of anomality (True if anomalous, False if not) based strictly on trap rejection criteria.
+    4. Provide both a reasoning for the vote, and a estimated anomaly category which correlates to the reasoning given
+    """
 
 
+    # Role: The specialist focusing on movement and trajectory
+    movement_behavior_agent_role = """
+    You are a trajectory Analysis Agent specializing in movement trajectories. 
+    Your role is to compare the observed motion of the part against the 'Golden Standard' of normal operation. 
+    oscillations, sporadicity, and sudden lags are all acceptable deviations from the normal, but unstable 
+    deviation from the normal where the part object leaves the track entirely, is not acceptable.
+    
+    Furthermore, you must deduce if the object reached the goal at the end, which is on the cliff side of the track.
+    If the part never reaches the cliff, and is solely moving around pre-trap and on the trap ramp side, then this is
+    also seen as an anomaly.
 
-if __name__ == "__main__":
-  vid_path = "data/DCM4_anomalies/normal_data/Video_index_0_viewport_0"
+    """
 
-  vid_obj = video_data_handler(vid_path)
-  vid_obj.load_from_self(target_image_size=(224, 224))
-
-  image = [vid_obj._data[0], vid_obj._data[100], vid_obj._data[100]]
-
-  vid_obj.load_images_from_path("/home/nguyenlocal/True_Sight/data", target_size=(224, 224))
-
-  image.append(vid_obj._data[0])
-
-  MODEL_NAME = "qwen3.5:4b"
-
-  agentic_system = single_agent_anomaly_detection_module(MODEL_NAME)
+    # Goal: The specific task for the movement agent
+    movement_behavior_agent_goal = """
+    Evaluate the movement patterns in the video.
+    1. Track the trajectory of the part from start to finish.
+    2. Compare the observed path against normal operational data (Does the part get processed within tolerable bounds?)
+    3. Provide a boolean vote of anomality (True if anomalous, False if not) based strictly on the reasoning and the end-position of the object
+    4. Provide both a reasoning for the vote, and a estimated anomaly category which correlates to the reasoning given
+    """
 
 
-  query = "which image is the odd one out, describe the main differences"
-  # image_path = "/home/nguyenlocal/True_Sight/data/DCM4_anomalies/normal_data/Video_index_4_viewport_0/Video_index_4_viewport_0_frame_1.png"
+    # Role: The final decision-maker and synthesizer
+    task_delegator_role = """
+    You are the Chief Synthesis Agent. Your role is to act as the final judge in a 
+    voting-based multi-agent system. You do not analyze the video yourself; instead, 
+    you analyze the reasoning and votes provided by three specialized agents. 
+    Your goal is to extract the most probable truth.
+    
+    the voting data will be preprocessed and given to you such that you already 
+    have a clear idea of the highest score given.
 
-  response_val = agentic_system.run_framework(query, image_input=image)
+    Ir you find improper or lacking reasoning behind the vote given, you are capable of
+    commanding a re-investigation by the specific expert agents, until you find the
+    reasoning to the specific vote satisfying.
+    """
 
-  print(" ----- final response ----- ")
-  print(response_val)
+    # Goal: The final aggregation task
+    task_delegator_goal = """
+    1: Analyze the reasoning behind each expert voter, and determine the probability and proper reasonability of each vote.
+    2: If neccesary reprompt, any agent with critique that can be used by the agents to properly reason their vote
+    3: If all reasonings are satisfactory and well correlated with their specific vote, then output the following values
+        - Anomaly boolean: True if video contains anomalous movements, false if not
+        - Anomaly category: A boiled down single-word category of the anomaly depicted (examples could be, pre-trap rejection or post-trap rejection, none if the video is categorized as normal data)
+        - reasoning: Give a reasoning for the score given, that is a boiled down concise version of each agents texts.
+    """
+
+
+    self.add_agent(
+        role_name="part_rejection_analysist",
+        role_description=trap_rejection_agent_role,
+        tool_func_list=[],
+        goal_for_role=trap_rejection_agent_goal,
+        main_agent=False
+    )
+
+
+    self.add_agent(
+        role_name="Movement_analysist",
+        role_description=movement_behavior_agent_role,
+        tool_func_list=[],
+        goal_for_role=movement_behavior_agent_goal,
+        main_agent=False
+    )
+
+    # Agentic agents cannot be directlty added as agents to a system so just spawn a new one as a variable
+    self._reflective_Agentic_agent = self_reflective_single_agent(true_sight_reasoning_framework)
+
+    self.add_agent(
+        role_name="task_delegator_judge",
+        role_description=task_delegator_role,
+        tool_func_list=[],
+        goal_for_role=task_delegator_goal,
+        main_agent=True
+    )
+
+
+  def run_framework(self, query, image_input=None, max_reflections=3, variable_constrain = None):
+    """
+    RUN THE FRAMEWORK WITH A REFLECTIVE LOOP
+    """
+    output_variable_constrain = copy.deepcopy(variable_constrain)
+    # 1. Initial preprocessing
+
+  
+    messages = self.preprocess_input(query=query, image_input=image_input)
+
+    expert_committee_variable_constrain = {
+      "is_anomaly": bool,
+      "anomaly_category": str,
+      "reasoning": str,
+    }
+
+    expert_committee_variable_constrain["is_anomaly"] = bool
+
+    # 2. Initial call to the main agent
+    response_rejection_expert = self.run_agent()
+
+        
+    return response
+
+
+  if __name__ == "__main__":
+    vid_path = "data/DCM4_anomalies/normal_data/Video_index_0_viewport_0"
+
+    vid_obj = video_data_handler(vid_path)
+    vid_obj.load_from_self(target_image_size=(512, 512))
+
+    image = [vid_obj._data[0], vid_obj._data[100], vid_obj._data[100]]
+
+    vid_obj.load_images_from_path("/home/nguyenlocal/True_Sight/data", target_size=(224, 224))
+
+    image.append(vid_obj._data[0])
+
+    MODEL_NAME = "qwen3.5:4b"
+
+    agentic_system = single_agent_anomaly_detection_module(MODEL_NAME)
+
+
+    query = "which image is the odd one out, describe the main differences"
+    # image_path = "/home/nguyenlocal/True_Sight/data/DCM4_anomalies/normal_data/Video_index_4_viewport_0/Video_index_4_viewport_0_frame_1.png"
+
+    response_val = agentic_system.run_framework(query, image_input=image)
+
+    print(" ----- final response ----- ")
+    print(response_val)
 
 
 
