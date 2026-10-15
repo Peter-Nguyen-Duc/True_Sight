@@ -1,6 +1,6 @@
 from logging_decorator.decorator_logging import decorate_all_class_methods, log_decorator, generate_logger_file
 import logging
-generate_logger_file()
+#generate_logger_file()
 
 from data_handler import video_data_handler
 from RAG import RAG_image_interfacer

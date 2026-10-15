@@ -12,7 +12,7 @@ from agent_tools import True_sight_agent_toolbox
 
 from logging_decorator.decorator_logging import decorate_all_class_methods, log_decorator, generate_logger_file
 import logging
-generate_logger_file()
+# generate_logger_file()
 
 import cv2
 import numpy as np
@@ -477,7 +477,8 @@ def test_dataset():
               results = anomaly_detector.video_AD(
                   video_input_path=full_subfolder_path, 
                   subsambled_input_images=10, 
-                  image_size=image_size
+                  image_size=image_size,
+                  normal_data_path="RAG_data/normal_data_224.pkl",
                   )
               
               results_empty = False
@@ -527,8 +528,8 @@ def test_video():
   RAG_sentence_transformer_model = "CLIP-ViT-B-32"
 
   # reasoning_module = single_agent_anomaly_detection_module()
-  # reasoning_module = self_reflective_single_agent()
-  reasoning_module = voting_based_multi_agent()
+  reasoning_module = self_reflective_single_agent()
+  # reasoning_module = voting_based_multi_agent()
 
   anomaly_detector = True_sight_interfacer(reasoning_module=reasoning_module, RAG_sentence_transformer_model=RAG_sentence_transformer_model, image_size=image_size)
 
@@ -583,7 +584,7 @@ def generate_RAG_database():
 if __name__ == '__main__':
 
   # generate_RAG_database()
-  test_video()
-  # test_dataset()
+  # test_video()
+  test_dataset()
 
 
