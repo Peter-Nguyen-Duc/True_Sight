@@ -729,7 +729,9 @@ class voting_based_multi_agent(true_sight_reasoning_framework):
     # 1. Initial preprocessing
 
   
-    messages = self.preprocess_input(query=query, image_input=image_input)
+    messages = []
+
+    messages_images_only = self.add_images_to_message(messages=messages, image_input=image_input)
 
     expert_committee_variable_constrain = {
       "is_anomaly": bool,
@@ -737,14 +739,81 @@ class voting_based_multi_agent(true_sight_reasoning_framework):
       "reasoning": str,
     }
 
-    expert_committee_variable_constrain["is_anomaly"] = bool
+    message_for_rejection_analysist = self.add_agent_agenda_to_message(messages=copy.deepcopy(messages_images_only), query=query, agent_name="part_rejection_analysist")
+    message_for_movement_analysist = self.add_agent_agenda_to_message(messages=copy.deepcopy(messages_images_only), query=query, agent_name="Movement_analysist")
 
-    # 2. Initial call to the main agent
-    response_rejection_expert = self.run_agent()
+    response_rejection_analysist  = self.call_agent(role_name="part_rejection_analysist", query=message_for_rejection_analysist, variable_constrain=expert_committee_variable_constrain)
+    message_for_movement_analysist  = self.call_agent(role_name="Movement_analysist", query=message_for_rejection_analysist, variable_constrain=expert_committee_variable_constrain)
+    response_reflective_agent = self._reflective_Agentic_agent.run_framework(query=query, image_input=image_input, variable_constrain=expert_committee_variable_constrain)
+
+
+    # 1. CALCULATE THE VOTE TALLY
+    all_responses = [response_rejection_analysist, message_for_movement_analysist, response_reflective_agent]
+    anomaly_votes = sum(1 for r in all_responses if r.get("is_anomaly") is True)
+    normal_votes = len(all_responses) - anomaly_votes
+    
+    majority_verdict = "ANOMALY" if anomaly_votes > normal_votes else "NORMAL"
+    tally_string = f"VOTE TALLY: {anomaly_votes} ANOMALY vs {normal_votes} NORMAL | MAJORITY: {majority_verdict}"
+
+
+    committee_findings = []
+    
+    findings_map = {
+      "Trap Rejection Specialist": response_rejection_analysist,
+      "Movement Dynamics Specialist": message_for_movement_analysist,
+      "General Reflective Agent": response_reflective_agent
+    }
+
+    for name, data in findings_map.items():
+      verdict = "ANOMALY" if data.get("is_anomaly") else "NORMAL"
+      category = data.get("anomaly_category", "N/A")
+      reasoning = data.get("reasoning", "No reasoning provided.")
+      
+      committee_findings.append(f"--- {name} ---\nVerdict: {verdict}\nCategory: {category}\nReasoning: {reasoning}")
+
+    # Join the detailed reports and prepending the tally at the top
+    committee_report = f"### SUMMARY TALLY\n{tally_string}\n\n### DETAILED REPORTS\n" + "\n\n".join(committee_findings)
+
+    
+    response = self.call_judge(messages_images_only=messages_images_only, committee_report=committee_report, query=query, variable_constrain=output_variable_constrain)
 
         
     return response
 
+  def call_judge(self, messages_images_only, committee_report: str, query: str, variable_constrain=None):
+    judge_query = f"""
+        You are the Final Judge. Your task is to review the original user request and the findings from three specialized agents.
+        
+        ### Original User Request:
+        {query}
+
+        ### Committee Expert Reports:
+        {committee_report}
+
+        ### Your Task:
+        1. Analyze the conflict between agents (e.g., if one says ANOMALY and others say NORMAL).
+        2. If a specialist (like Rejection or Movement) provides strong evidence, weight their vote higher than the general agent.
+        3. Provide a final definitive verdict on whether the video is anomalous.
+        4. Infer the final anomaly description based on the most convincing reasoning.
+        """
+    
+    messages_for_judge = self.add_agent_agenda_to_message(message=messages_images_only, 
+                                                                      query=judge_query, 
+                                                                      agent_name="task_delegator_judge")
+    
+    
+    self.check_context_limit(messages=messages_for_judge)
+    # 6. Final Call to the Judge
+    final_verdict = self.call_agent(
+        role_name="task_delegator_judge", 
+        query=messages_for_judge, 
+        variable_constrain=variable_constrain # Or a specialized judge constrain
+    )
+
+
+    return final_verdict
+
+    
 
   if __name__ == "__main__":
     vid_path = "data/DCM4_anomalies/normal_data/Video_index_0_viewport_0"
