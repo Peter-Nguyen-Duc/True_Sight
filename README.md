@@ -21,21 +21,14 @@ This module extrapolates video data, from various data sources such as:
  - tfrecords of image data 
 
 
-## memory handler
+## RAG retriever
 
-A simple class whose purpose it is to store and retrieve video data temporarily, used by the anomaly detector.
-So far it only stores the images in RAM
+A class that vectorizes all images and stores them in a database, for RAG-retrieval by the anomaly detector. 
 
 
 ## True sight reasoning LLM framework
 
 This module wraps an ollama base agentic system into a module which can be understood and utilized by the anomaly detection framework
-
-
-## user interface
-
-Not sure if i am going to develop this yet. But i think it would be cool to develop a user interface which can be used to both run 
-the anomaly interfacer, but also use the anomaly interfacer for additional purposes such as video frame labeling, or alike.
 
 
 
